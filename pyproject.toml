@@ -1,0 +1,33 @@
+[project]
+name = "thaillm-backend"
+version = "0.1.0"
+description = "Production-ready ThaiLLM FastAPI inference gateway"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastmcp>=3.3.1",
+    "fastapi>=0.115.0",
+    "httpx>=0.28.0",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.7.0",
+    "uvicorn[standard]>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "anyio>=4.0",
+    "pytest>=8.3.0",
+    "pytest-cov>=5.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
