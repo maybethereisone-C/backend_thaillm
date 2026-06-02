@@ -39,7 +39,7 @@ class InferenceService:
 
     def _default_updates(self, model: str | None, max_tokens: int | None) -> dict:
         return {
-            "model": model or self._settings.model_id,
+            "model": model if (model and model != "default") else self._settings.model_id,
             "max_tokens": max_tokens or self._settings.max_tokens_default,
         }
 
