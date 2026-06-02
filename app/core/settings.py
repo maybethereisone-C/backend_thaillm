@@ -16,14 +16,10 @@ class Settings(BaseSettings):
     upstream_api_key: SecretStr | None = None
     request_timeout_seconds: float = Field(default=60.0, gt=0)
     max_tokens_default: int = Field(default=512, gt=0)
-    max_tokens_limit: int = Field(default=2048, gt=0)
     api_keys: Annotated[list[str], NoDecode] = Field(default_factory=list)
     allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     trusted_hosts: Annotated[list[str], NoDecode] = Field(default_factory=list)
-    request_body_limit_bytes: int = Field(default=64_000, gt=0)
     prompt_guard_enabled: bool = True
-    prompt_max_chars: int = Field(default=20_000, gt=0)
-    response_text_limit_chars: int = Field(default=20_000, gt=0)
 
     @field_validator("api_keys", "allowed_origins", "trusted_hosts", mode="before")
     @classmethod

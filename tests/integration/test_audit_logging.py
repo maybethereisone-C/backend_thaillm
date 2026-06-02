@@ -237,57 +237,6 @@ def test_no_auth_failed_log_when_endpoint_is_open(caplog):
     assert len(_events(caplog, "auth_failed")) == 0
 
 
-# ── BodySizeLimitMiddleware: request_too_large ────────────────────────────────
-
-def test_request_too_large_logged(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_REQUEST_BODY_LIMIT_BYTES", "10")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello world this is a long body"})
-
-    assert len(_events(caplog, "request_too_large")) == 1
-
-
-def test_request_too_large_log_has_correct_path(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_REQUEST_BODY_LIMIT_BYTES", "10")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello world this is a long body"})
-
-    ev = _events(caplog, "request_too_large")[0]
-    assert ev["path"] == "/v1/completions"
-
-
-def test_request_too_large_log_has_content_length(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_REQUEST_BODY_LIMIT_BYTES", "10")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello world this is a long body"})
-
-    ev = _events(caplog, "request_too_large")[0]
-    assert "content_length" in ev
-    assert ev["content_length"] > 10
-
-
-def test_request_too_large_log_has_client_ip_and_request_id(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_REQUEST_BODY_LIMIT_BYTES", "10")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello world this is a long body"})
-
-    ev = _events(caplog, "request_too_large")[0]
-    assert "client_ip" in ev
-    assert "request_id" in ev
-
-
-def test_no_request_too_large_log_when_body_within_limit(caplog):
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hi"})
-
-    assert len(_events(caplog, "request_too_large")) == 0
-
-
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _is_json(s: str) -> bool:

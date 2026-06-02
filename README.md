@@ -122,7 +122,7 @@ Response:
 }
 ```
 
-`model` is optional in the request; when omitted the server uses `LLM_MODEL_ID`. `max_tokens` is capped at `LLM_MAX_TOKENS_LIMIT`. Errors return a structured body: `{"error": {"code": ..., "message": ..., "request_id": ...}}`.
+`model` is optional in the request; when omitted the server uses `LLM_MODEL_ID`. Errors return a structured body: `{"error": {"code": ..., "message": ..., "request_id": ...}}`.
 
 Interactive API docs are served at `/docs` (Swagger UI) and `/redoc`.
 
@@ -154,12 +154,8 @@ All settings use the `LLM_` prefix. Set them via `.env` or environment variables
 | `LLM_API_KEYS` | — | CSV or JSON list — enforces auth on `/v1` |
 | `LLM_ALLOWED_ORIGINS` | — | CORS origin allowlist |
 | `LLM_TRUSTED_HOSTS` | — | Request rejected if its host is not in the list |
-| `LLM_REQUEST_BODY_LIMIT_BYTES` | `64000` | Max request body size |
 | `LLM_MAX_TOKENS_DEFAULT` | `512` | Used when a request omits `max_tokens` |
-| `LLM_MAX_TOKENS_LIMIT` | `2048` | Hard ceiling, enforced server-side |
 | `LLM_PROMPT_GUARD_ENABLED` | `true` | Prompt-injection detection |
-| `LLM_PROMPT_MAX_CHARS` | `20000` | Max prompt length |
-| `LLM_RESPONSE_TEXT_LIMIT_CHARS` | `20000` | Max upstream response length |
 
 `LLM_API_KEYS`, `LLM_ALLOWED_ORIGINS`, and `LLM_TRUSTED_HOSTS` accept either CSV (`a,b`) or a JSON list (`["a","b"]`).
 

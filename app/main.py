@@ -12,7 +12,6 @@ from app.core.settings import get_settings
 from app.middleware import (
     ApiKeyAuthMiddleware,
     AuditLogMiddleware,
-    BodySizeLimitMiddleware,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
@@ -31,7 +30,6 @@ def create_app() -> FastAPI:
         api_keys=settings.api_keys,
         protected_prefixes=("/v1",),
     )
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.request_body_limit_bytes)
     if settings.allowed_origins:
         app.add_middleware(
             CORSMiddleware,

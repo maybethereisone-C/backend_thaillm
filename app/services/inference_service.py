@@ -17,12 +17,11 @@ class InferenceService:
     def __init__(self, backend: InferenceBackend, settings: Settings) -> None:
         self._backend = backend
         self._settings = settings
-        self._prompt_guard = PromptInjectionGuard(max_chars=settings.prompt_max_chars)
-        self._output_guard = OutputGuard(max_chars=settings.response_text_limit_chars)
+        self._prompt_guard = PromptInjectionGuard()
+        self._output_guard = OutputGuard()
 
     async def complete(self, request: CompletionRequest) -> CompletionResponse:
         request = request.model_copy(update=self._default_updates(request.model, request.max_tokens))
-        self._enforce_max_tokens(request.max_tokens)
         self._enforce_prompt_guard([request.prompt])
         response = await self._call_with_timeout(self._backend.complete(request))
         self._enforce_response_limits([choice.text for choice in response.choices])
@@ -30,7 +29,6 @@ class InferenceService:
 
     async def chat(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
         request = request.model_copy(update=self._default_updates(request.model, request.max_tokens))
-        self._enforce_max_tokens(request.max_tokens)
         self._enforce_prompt_guard([message.content for message in request.messages])
         response = await self._call_with_timeout(self._backend.chat(request))
         self._enforce_response_limits([choice.message.content for choice in response.choices])
@@ -44,10 +42,6 @@ class InferenceService:
             "model": model or self._settings.model_id,
             "max_tokens": max_tokens or self._settings.max_tokens_default,
         }
-
-    def _enforce_max_tokens(self, max_tokens: int | None) -> None:
-        if max_tokens is not None and max_tokens > self._settings.max_tokens_limit:
-            raise RequestPolicyError(f"max_tokens exceeds limit: {self._settings.max_tokens_limit}")
 
     def _enforce_prompt_guard(self, values: list[str]) -> None:
         if not self._settings.prompt_guard_enabled:

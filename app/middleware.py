@@ -20,29 +20,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class BodySizeLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, *, max_bytes: int) -> None:
-        super().__init__(app)
-        self._max_bytes = max_bytes
-
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > self._max_bytes:
-            audit_logger.warning(json.dumps({
-                "event": "request_too_large",
-                "path": request.url.path,
-                "content_length": int(content_length),
-                "client_ip": request.client.host if request.client else None,
-                "request_id": getattr(request.state, "request_id", None),
-            }))
-            return Response(
-                content='{"error":{"code":"request_body_too_large","message":"request body too large"}}',
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                media_type="application/json",
-            )
-        return await call_next(request)
-
-
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)

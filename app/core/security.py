@@ -15,8 +15,7 @@ class GuardResult:
 
 
 class PromptInjectionGuard:
-    def __init__(self, *, max_chars: int) -> None:
-        self._max_chars = max_chars
+    def __init__(self) -> None:
         self._patterns = [
             re.compile(pattern, re.IGNORECASE)
             for pattern in (
@@ -41,9 +40,6 @@ class PromptInjectionGuard:
         }
 
     def inspect_text(self, value: str) -> GuardResult:
-        if len(value) > self._max_chars:
-            return GuardResult(False, f"text exceeds {self._max_chars} characters")
-
         normalized = self._normalize(value)
         for pattern in self._patterns:
             if pattern.search(normalized):
@@ -85,8 +81,7 @@ class PromptInjectionGuard:
 
 
 class OutputGuard:
-    def __init__(self, *, max_chars: int) -> None:
-        self._max_chars = max_chars
+    def __init__(self) -> None:
         self._patterns = [
             re.compile(pattern, re.IGNORECASE)
             for pattern in (
@@ -98,8 +93,6 @@ class OutputGuard:
         ]
 
     def inspect_text(self, value: str) -> GuardResult:
-        if len(value) > self._max_chars:
-            return GuardResult(False, f"output exceeds {self._max_chars} characters")
         if any(pattern.search(value) for pattern in self._patterns):
             return GuardResult(False, "unsafe model output detected")
         return GuardResult(True)

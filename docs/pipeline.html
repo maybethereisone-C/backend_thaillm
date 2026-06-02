@@ -229,10 +229,6 @@
     .c-net    .mw-detail { color: #c9a227; }
     .c-net    .mw-reject { color: #f0883e; }
 
-    .c-size   { background: #1c0e0e; border-color: #6e1a1a; color: #f85149; }
-    .c-size   .mw-detail { color: #c97070; }
-    .c-size   .mw-reject { color: #f85149; }
-
     .c-auth   { background: #1a1400; border-color: #7a5f00; color: #d29922; }
     .c-auth   .mw-detail { color: #b8860b; }
     .c-auth   .mw-reject { color: #f85149; }
@@ -415,7 +411,6 @@
     }
     .resp-200 { background: #0d3321; color: #3fb950; }
     .resp-401 { background: #1c0e0e; color: #f85149; }
-    .resp-413 { background: #1c0e0e; color: #f85149; }
     .resp-400 { background: #1a1400; color: #d29922; }
     .resp-503 { background: #1a0f2e; color: #bc8cff; }
 
@@ -521,9 +516,9 @@
   <h1>LLM Inference Gateway</h1>
   <p>System Pipeline &amp; Test Coverage — <code>ghcr.io/astral-sh/uv:python3.11-bookworm-slim</code></p>
   <div class="badge-row">
-    <span class="badge pass"><span class="dot"></span>87 / 87 tests passing</span>
-    <span class="badge unit"><span class="dot"></span>51 unit tests</span>
-    <span class="badge int"><span class="dot"></span>32 integration tests</span>
+    <span class="badge pass"><span class="dot"></span>78 / 78 tests passing</span>
+    <span class="badge unit"><span class="dot"></span>48 unit tests</span>
+    <span class="badge int"><span class="dot"></span>26 integration tests</span>
     <span class="badge docker"><span class="dot"></span>Docker build ✓</span>
   </div>
 </div>
@@ -569,7 +564,7 @@
 
   <!-- Test Breakdown -->
   <div class="card">
-    <div class="card-title">Test Suite — 87 Tests</div>
+    <div class="card-title">Test Suite — 78 Tests</div>
     <div class="test-grid">
       <div class="test-row">
         <span class="tname">API (root)</span>
@@ -577,11 +572,11 @@
       </div>
       <div class="test-row">
         <span class="tname">Guardrails (int)</span>
-        <span class="tcount purple">6</span>
+        <span class="tcount purple">5</span>
       </div>
       <div class="test-row">
         <span class="tname">Audit logging (int)</span>
-        <span class="tcount purple">26</span>
+        <span class="tcount purple">21</span>
       </div>
       <div class="test-row">
         <span class="tname">Audit config (unit)</span>
@@ -593,11 +588,11 @@
       </div>
       <div class="test-row">
         <span class="tname">Security guards (unit)</span>
-        <span class="tcount blue">8</span>
+        <span class="tcount blue">7</span>
       </div>
       <div class="test-row">
         <span class="tname">Inference svc (unit)</span>
-        <span class="tcount blue">4</span>
+        <span class="tcount blue">2</span>
       </div>
       <div class="test-row">
         <span class="tname">Backend factory</span>
@@ -661,15 +656,6 @@
         <div class="mw-tests">optional</div>
         <div class="mw-name">CORS</div>
         <div class="mw-detail">Origin headers</div>
-      </div>
-      <div class="pipe-arrow">→</div>
-
-      <!-- Body Size -->
-      <div class="mw-block c-size" data-tip="Rejects oversized requests&#10;Checks Content-Length header&#10;Logs: request_too_large&#10;Tests: 5 integration">
-        <div class="mw-tests">5 int tests</div>
-        <div class="mw-name">BodySizeLimit</div>
-        <div class="mw-detail">Content-Length check</div>
-        <div class="mw-reject">↓ 413</div>
       </div>
       <div class="pipe-arrow">→</div>
 
@@ -763,11 +749,6 @@
         <span class="svc-name">Fill defaults</span>
         <span style="margin-left:auto; font-size:10px; color:#8b949e;">model + max_tokens</span>
       </div>
-      <div class="svc-step step-tokens">
-        <span class="svc-icon">⚠️</span>
-        <span class="svc-name">Enforce max_tokens limit</span>
-        <span class="svc-err">→ 400</span>
-      </div>
       <div class="svc-step step-guard">
         <span class="svc-icon">🛡️</span>
         <span class="svc-name">PromptInjectionGuard</span>
@@ -831,7 +812,6 @@
         <span class="resp-code resp-401">401 Unauthorized</span>
       </div>
       <div style="margin-top:4px;">
-        <span class="resp-code resp-413">413 Too Large</span>
         <span class="resp-code resp-503">503 Unavailable</span>
       </div>
     </div>
@@ -840,7 +820,6 @@
       <div class="ap-title">Audit Log Events (stdout JSON)</div>
       <div class="audit-event"><span>request</span> — every HTTP call (INFO)</div>
       <div class="audit-event"><span>auth_failed</span> — bad / missing key (WARN)</div>
-      <div class="audit-event"><span>request_too_large</span> — Content-Length (WARN)</div>
       <div style="font-size:10px; color:#3d444d; margin-top:6px;">
         Fields: event, method, path, status,<br>
         duration_ms, request_id, client_ip, key_prefix
@@ -859,22 +838,20 @@
     <div>
       <div style="font-size:11px; font-weight:700; color:#f85149; margin-bottom:8px;">PromptInjectionGuard (input)</div>
       <div style="font-size:11px; color:#8b949e; line-height:1.8;">
-        • Text length &gt; max_chars → reject<br>
         • Regex patterns: <code style="color:#79c0ff;">ignore previous instructions</code>, <code style="color:#79c0ff;">reveal system prompt</code>, tool call override, img exfil…<br>
         • Typoglycemia detection (scrambled keywords)<br>
         • Base64-decoded injection scan<br>
-        <span style="color:#58a6ff;">8 unit tests</span>
+        <span style="color:#58a6ff;">7 unit tests</span>
       </div>
     </div>
 
     <div>
       <div style="font-size:11px; font-weight:700; color:#bc8cff; margin-bottom:8px;">OutputGuard (response)</div>
       <div style="font-size:11px; color:#8b949e; line-height:1.8;">
-        • Output length &gt; max_chars → reject<br>
         • Detects leaked system prompt (<code style="color:#79c0ff;">SYSTEM: You are</code>)<br>
         • Detects leaked API keys in output<br>
         • Detects img exfil markup in output<br>
-        <span style="color:#58a6ff;">included in 8 unit tests</span>
+        <span style="color:#58a6ff;">included in 7 unit tests</span>
       </div>
     </div>
 
@@ -882,7 +859,7 @@
 </div>
 
 <div style="text-align:center; font-size:10px; color:#3d444d; margin-top:16px;">
-  Generated from live test run — 87 / 87 ✓ &nbsp;|&nbsp; LLM Inference Gateway
+  Generated from live test run — 78 / 78 ✓ &nbsp;|&nbsp; LLM Inference Gateway
 </div>
 
 </body>

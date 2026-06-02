@@ -30,16 +30,6 @@ def test_inference_requires_api_key_when_configured(monkeypatch) -> None:
     assert allowed.status_code == 200
 
 
-def test_body_size_limit_rejects_oversized_request(monkeypatch) -> None:
-    monkeypatch.setenv("LLM_REQUEST_BODY_LIMIT_BYTES", "10")
-    client = TestClient(create_app())
-
-    response = client.post("/v1/completions", json={"prompt": "hello world"})
-
-    assert response.status_code == 413
-    assert response.json()["error"]["code"] == "request_body_too_large"
-
-
 def test_security_headers_are_set() -> None:
     client = TestClient(create_app())
 
