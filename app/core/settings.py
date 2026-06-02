@@ -7,11 +7,11 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="THAILLM_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env", extra="ignore")
 
     api_version: str = "0.1.0"
     backend: Literal["fake", "openai_compatible"] = "fake"
-    model_id: str = "ThaiLLM/ThaiLLM-8B-SFT-IQ"
+    model_id: str = "default"
     upstream_base_url: AnyHttpUrl | None = None
     upstream_api_key: SecretStr | None = None
     request_timeout_seconds: float = Field(default=60.0, gt=0)
@@ -21,12 +21,9 @@ class Settings(BaseSettings):
     allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     trusted_hosts: Annotated[list[str], NoDecode] = Field(default_factory=list)
     request_body_limit_bytes: int = Field(default=64_000, gt=0)
-    rate_limit_per_minute: int = Field(default=60, ge=0)
     prompt_guard_enabled: bool = True
     prompt_max_chars: int = Field(default=20_000, gt=0)
     response_text_limit_chars: int = Field(default=20_000, gt=0)
-    mcp_enabled: bool = True
-    mcp_manifest_signing_key: SecretStr | None = None
 
     @field_validator("api_keys", "allowed_origins", "trusted_hosts", mode="before")
     @classmethod
@@ -51,7 +48,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_backend_config(self) -> "Settings":
         if self.backend == "openai_compatible" and self.upstream_base_url is None:
-            raise ValueError("THAILLM_UPSTREAM_BASE_URL is required when THAILLM_BACKEND=openai_compatible")
+            raise ValueError("LLM_UPSTREAM_BASE_URL is required when LLM_BACKEND=openai_compatible")
         return self
 
 

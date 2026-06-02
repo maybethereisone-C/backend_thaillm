@@ -8,7 +8,7 @@ from app.dependencies import get_inference_service
 def clear_cached_dependencies(monkeypatch):
     # Isolate tests from local .env — always start with fake backend.
     # Tests that need a different backend override via their own monkeypatch.setenv.
-    monkeypatch.setenv("THAILLM_BACKEND", "fake")
+    monkeypatch.setenv("LLM_BACKEND", "fake")
     get_settings.cache_clear()
     get_inference_service.cache_clear()
     yield

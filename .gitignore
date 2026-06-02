@@ -22,8 +22,10 @@ build/
 *.egg-info/
 logs/
 *.log
-docs/
+docs/*
+!docs/pipeline.html
 .claude/
+CLAUDE.md
 *.pem
 *.key
 *.p12

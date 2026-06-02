@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Inference Gateway — System Pipeline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    /* ─── HEADER ─────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e6edf3;
+      letter-spacing: .5px;
+    }
+    .header p {
+      color: #8b949e;
+      margin-top: 4px;
+      font-size: 12px;
+    }
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .badge.pass .dot { background: #3fb950; }
+    .badge.unit .dot { background: #58a6ff; }
+    .badge.int .dot  { background: #bc8cff; }
+    .badge.docker .dot { background: #f0883e; }
+
+    /* ─── TOP GRID (Docker + Tests) ──────────────────── */
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 700px) { .top-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8b949e;
+      margin-bottom: 14px;
+    }
+
+    /* Docker build stages */
+    .docker-stages {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+    .docker-stage {
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      text-align: center;
+      flex: 1;
+      min-width: 90px;
+    }
+    .docker-stage .num {
+      font-size: 10px;
+      color: #8b949e;
+      margin-bottom: 2px;
+    }
+    .docker-stage .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+    .docker-stage .sub {
+      font-size: 10px;
+      color: #8b949e;
+      margin-top: 2px;
+    }
+    .docker-stage.ok { border-color: #238636; }
+    .docker-arrow {
+      color: #3fb950;
+      font-size: 16px;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* Test breakdown */
+    .test-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .test-row {
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .test-row .tname { font-size: 11px; color: #c9d1d9; }
+    .test-row .tcount {
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .test-row .tcount.green { color: #3fb950; }
+    .test-row .tcount.blue  { color: #58a6ff; }
+    .test-row .tcount.purple{ color: #bc8cff; }
+
+    /* ─── SECTION LABEL ───────────────────────────────── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8b949e;
+      margin-bottom: 14px;
+    }
+
+    /* ─── PIPELINE WRAPPER ────────────────────────────── */
+    .pipeline-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+
+    /* ─── MIDDLEWARE ROW ──────────────────────────────── */
+    .mw-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 28px;
+      flex-wrap: nowrap;
+    }
+
+    .mw-block {
+      position: relative;
+      border-radius: 8px;
+      border: 1.5px solid;
+      padding: 10px 14px;
+      min-width: 110px;
+      text-align: center;
+      cursor: default;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .mw-block:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    }
+    .mw-block .mw-name {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .mw-block .mw-detail {
+      font-size: 10px;
+      margin-top: 3px;
+      opacity: .75;
+    }
+    .mw-block .mw-reject {
+      position: absolute;
+      bottom: -26px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .mw-block .mw-tests {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: #8b949e;
+      white-space: nowrap;
+    }
+
+    /* arrow between blocks */
+    .pipe-arrow {
+      color: #3d444d;
+      font-size: 18px;
+      padding: 0 4px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    /* color schemes */
+    .c-net    { background: #1c1500; border-color: #9e6a03; color: #f0883e; }
+    .c-net    .mw-detail { color: #c9a227; }
+    .c-net    .mw-reject { color: #f0883e; }
+
+    .c-size   { background: #1c0e0e; border-color: #6e1a1a; color: #f85149; }
+    .c-size   .mw-detail { color: #c97070; }
+    .c-size   .mw-reject { color: #f85149; }
+
+    .c-auth   { background: #1a1400; border-color: #7a5f00; color: #d29922; }
+    .c-auth   .mw-detail { color: #b8860b; }
+    .c-auth   .mw-reject { color: #f85149; }
+
+    .c-sec    { background: #0f1a10; border-color: #238636; color: #3fb950; }
+    .c-sec    .mw-detail { color: #56d364; }
+
+    .c-audit  { background: #0d1b2a; border-color: #1f4d7a; color: #58a6ff; }
+    .c-audit  .mw-detail { color: #79c0ff; }
+
+    .c-reqid  { background: #1a1a2e; border-color: #3a3a6e; color: #8b949e; }
+    .c-reqid  .mw-detail { color: #aaaacc; }
+
+    .c-client { background: #161b22; border-color: #3d444d; color: #e6edf3; }
+
+    /* ─── ROUTER ──────────────────────────────────────── */
+    .router-block {
+      background: #1a0f2e;
+      border: 1.5px solid #6e40c9;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: inline-block;
+      min-width: 200px;
+    }
+    .router-block .router-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #bc8cff;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .route-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+      border-bottom: 1px solid #2d2047;
+      font-size: 11px;
+    }
+    .route-item:last-child { border-bottom: none; }
+    .route-method {
+      font-size: 9px;
+      font-weight: 700;
+      border-radius: 3px;
+      padding: 1px 4px;
+      min-width: 30px;
+      text-align: center;
+    }
+    .get  { background: #0d3321; color: #3fb950; }
+    .post { background: #1a1f00; color: #e3b341; }
+    .route-path { color: #c9d1d9; font-family: monospace; }
+    .route-dest { color: #8b949e; margin-left: auto; font-size: 10px; }
+
+    /* ─── SERVICE + BACKEND ───────────────────────────── */
+    .service-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .service-block {
+      background: #0d1b2a;
+      border: 1.5px solid #1f6feb;
+      border-radius: 8px;
+      padding: 12px 16px;
+      min-width: 200px;
+      flex: 1;
+    }
+    .service-block .svc-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #79c0ff;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .svc-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      margin-bottom: 4px;
+      background: #1c2d3e;
+      border-left: 3px solid;
+      font-size: 11px;
+    }
+    .svc-step .svc-icon { font-size: 13px; }
+    .svc-step .svc-name { color: #c9d1d9; font-weight: 600; }
+    .svc-step .svc-err  { margin-left: auto; font-size: 10px; font-weight: 700; }
+    .step-guard   { border-color: #f85149; }
+    .step-tokens  { border-color: #d29922; }
+    .step-call    { border-color: #3fb950; }
+    .step-output  { border-color: #bc8cff; }
+    .step-guard   .svc-err { color: #f85149; }
+    .step-tokens  .svc-err { color: #d29922; }
+    .step-call    .svc-err { color: #f85149; }
+    .step-output  .svc-err { color: #bc8cff; }
+
+    .backend-block {
+      background: #0f1a10;
+      border: 1.5px solid #238636;
+      border-radius: 8px;
+      padding: 12px 16px;
+      min-width: 180px;
+    }
+    .backend-block .be-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #3fb950;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .be-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 5px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      border: 1px solid #30363d;
+      background: #1c2128;
+    }
+    .be-icon { font-size: 14px; }
+    .be-name { font-weight: 600; color: #e6edf3; }
+    .be-sub  { font-size: 10px; color: #8b949e; }
+    .be-tag  {
+      margin-left: auto;
+      font-size: 9px;
+      font-weight: 700;
+      border-radius: 3px;
+      padding: 1px 5px;
+    }
+    .tag-test { background: #1f3251; color: #58a6ff; }
+    .tag-prod { background: #0d3321; color: #3fb950; }
+
+    /* ─── CONNECTOR LINES ─────────────────────────────── */
+    .connector {
+      text-align: center;
+      color: #3d444d;
+      font-size: 20px;
+      margin: 4px 0;
+    }
+    .connector-label {
+      font-size: 10px;
+      color: #8b949e;
+      font-weight: 600;
+      display: inline-block;
+      background: #161b22;
+      padding: 2px 8px;
+      border-radius: 10px;
+      border: 1px solid #30363d;
+      margin: 0 8px;
+      vertical-align: middle;
+    }
+
+    /* ─── RESPONSE BLOCK ─────────────────────────────── */
+    .response-block {
+      background: #0f1a10;
+      border: 1.5px solid #238636;
+      border-radius: 8px;
+      padding: 10px 16px;
+      text-align: center;
+      min-width: 160px;
+    }
+    .response-block .resp-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #3fb950;
+      margin-bottom: 6px;
+    }
+    .resp-code {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 3px;
+      padding: 2px 6px;
+      margin: 2px;
+    }
+    .resp-200 { background: #0d3321; color: #3fb950; }
+    .resp-401 { background: #1c0e0e; color: #f85149; }
+    .resp-413 { background: #1c0e0e; color: #f85149; }
+    .resp-400 { background: #1a1400; color: #d29922; }
+    .resp-503 { background: #1a0f2e; color: #bc8cff; }
+
+    /* ─── AUDIT PATH ─────────────────────────────────── */
+    .audit-path {
+      background: #0d1b2a;
+      border: 1px dashed #1f4d7a;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .audit-path .ap-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+    .audit-event {
+      font-size: 10px;
+      font-family: monospace;
+      color: #8b949e;
+      padding: 1px 0;
+    }
+    .audit-event span { color: #79c0ff; }
+
+    /* ─── LAYOUT HELPERS ─────────────────────────────── */
+    .flex-center { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+    .flex-col    { display: flex; flex-direction: column; align-items: center; }
+    .mt8  { margin-top: 8px; }
+    .mt16 { margin-top: 16px; }
+    .mt24 { margin-top: 24px; }
+
+    /* ─── LEGEND ─────────────────────────────────────── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: #8b949e;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+    }
+
+    /* down arrow from a block */
+    .down-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .down-arrow .da-line {
+      width: 2px;
+      height: 20px;
+      background: #3d444d;
+    }
+    .down-arrow .da-label {
+      font-size: 10px;
+      color: #8b949e;
+      font-family: monospace;
+    }
+
+    /* tooltip */
+    [data-tip] { position: relative; }
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #c9d1d9;
+      white-space: pre;
+      z-index: 100;
+      pointer-events: none;
+      min-width: 160px;
+      text-align: left;
+    }
+
+    /* horizontal scroll hint */
+    .scroll-hint {
+      font-size: 10px;
+      color: #3d444d;
+      text-align: right;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════ -->
+<div class="header">
+  <h1>LLM Inference Gateway</h1>
+  <p>System Pipeline &amp; Test Coverage — <code>ghcr.io/astral-sh/uv:python3.11-bookworm-slim</code></p>
+  <div class="badge-row">
+    <span class="badge pass"><span class="dot"></span>87 / 87 tests passing</span>
+    <span class="badge unit"><span class="dot"></span>51 unit tests</span>
+    <span class="badge int"><span class="dot"></span>32 integration tests</span>
+    <span class="badge docker"><span class="dot"></span>Docker build ✓</span>
+  </div>
+</div>
+
+<!-- ═══ TOP GRID ══════════════════════════════════════════ -->
+<div class="top-grid">
+
+  <!-- Docker Build Pipeline -->
+  <div class="card">
+    <div class="card-title">Docker Build Pipeline</div>
+    <div class="docker-stages">
+      <div class="docker-stage ok">
+        <div class="num">1</div>
+        <div class="label">Base Image</div>
+        <div class="sub">uv + python3.11</div>
+      </div>
+      <div class="docker-arrow">→</div>
+      <div class="docker-stage ok">
+        <div class="num">2</div>
+        <div class="label">User Setup</div>
+        <div class="sub">llm:llm</div>
+      </div>
+      <div class="docker-arrow">→</div>
+      <div class="docker-stage ok">
+        <div class="num">3</div>
+        <div class="label">Deps Install</div>
+        <div class="sub">24 pkgs --no-dev</div>
+      </div>
+      <div class="docker-arrow">→</div>
+      <div class="docker-stage ok">
+        <div class="num">4</div>
+        <div class="label">Copy app/</div>
+        <div class="sub">no tests ✓</div>
+      </div>
+      <div class="docker-arrow">→</div>
+      <div class="docker-stage ok">
+        <div class="num">5</div>
+        <div class="label">uvicorn</div>
+        <div class="sub">4 workers :8000</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Breakdown -->
+  <div class="card">
+    <div class="card-title">Test Suite — 87 Tests</div>
+    <div class="test-grid">
+      <div class="test-row">
+        <span class="tname">API (root)</span>
+        <span class="tcount blue">4</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Guardrails (int)</span>
+        <span class="tcount purple">6</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Audit logging (int)</span>
+        <span class="tcount purple">26</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Audit config (unit)</span>
+        <span class="tcount blue">11</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Middleware log (unit)</span>
+        <span class="tcount blue">20</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Security guards (unit)</span>
+        <span class="tcount blue">8</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Inference svc (unit)</span>
+        <span class="tcount blue">4</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Backend factory</span>
+        <span class="tcount blue">3</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">OpenAI backend</span>
+        <span class="tcount blue">3</span>
+      </div>
+      <div class="test-row">
+        <span class="tname">Settings (unit)</span>
+        <span class="tcount blue">2</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ PIPELINE LEGEND ═══════════════════════════════════ -->
+<div style="margin-bottom:10px;">
+  <div class="section-label">HTTP Request Pipeline</div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#9e6a03;"></div>Network</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6e1a1a;"></div>Limit / Reject</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7a5f00;"></div>Auth</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#238636;"></div>Security / Pass-through</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1f4d7a;"></div>Observability</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3a3a6e;"></div>Request tracking</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6e40c9;"></div>Routing</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1f6feb;"></div>Service</div>
+  </div>
+</div>
+
+<!-- ═══ MAIN PIPELINE CARD ════════════════════════════════ -->
+<div class="pipeline-card">
+  <div class="scroll-hint">← scroll if needed →</div>
+
+  <!-- ROW 1: Client → outer middleware -->
+  <div style="margin-top:20px;">
+    <div class="section-label" style="font-size:10px; margin-bottom:18px;">① INCOMING REQUEST — Middleware executes outermost→innermost</div>
+    <div class="mw-row">
+
+      <!-- Client -->
+      <div class="mw-block c-client" data-tip="HTTP client&#10;Sends: x-api-key / Authorization&#10;Optional: x-request-id">
+        <div class="mw-name">Client</div>
+        <div class="mw-detail">HTTP Request</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- TrustedHost -->
+      <div class="mw-block c-net" data-tip="Optional middleware&#10;Rejects unknown Host headers&#10;Config: TRUSTED_HOSTS">
+        <div class="mw-tests">optional</div>
+        <div class="mw-name">TrustedHost</div>
+        <div class="mw-detail">Host validation</div>
+        <div class="mw-reject">↓ 400</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- CORS -->
+      <div class="mw-block c-sec" data-tip="Optional middleware&#10;Adds CORS headers&#10;Config: ALLOWED_ORIGINS">
+        <div class="mw-tests">optional</div>
+        <div class="mw-name">CORS</div>
+        <div class="mw-detail">Origin headers</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- Body Size -->
+      <div class="mw-block c-size" data-tip="Rejects oversized requests&#10;Checks Content-Length header&#10;Logs: request_too_large&#10;Tests: 5 integration">
+        <div class="mw-tests">5 int tests</div>
+        <div class="mw-name">BodySizeLimit</div>
+        <div class="mw-detail">Content-Length check</div>
+        <div class="mw-reject">↓ 413</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- ApiKeyAuth -->
+      <div class="mw-block c-auth" data-tip="Protects /v1/* paths&#10;x-api-key or Bearer token&#10;Logs: auth_failed&#10;Tests: 2 int + 20 unit (key prefix)">
+        <div class="mw-tests">2 int + 20 unit</div>
+        <div class="mw-name">ApiKeyAuth</div>
+        <div class="mw-detail">x-api-key / Bearer</div>
+        <div class="mw-reject">↓ 401</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- Security Headers -->
+      <div class="mw-block c-sec" data-tip="Injects security headers:&#10;x-content-type-options&#10;x-frame-options&#10;referrer-policy&#10;cache-control&#10;Tests: 1 integration">
+        <div class="mw-tests">1 int test</div>
+        <div class="mw-name">SecurityHeaders</div>
+        <div class="mw-detail">nosniff / DENY</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- Audit Log -->
+      <div class="mw-block c-audit" data-tip="Wraps every request&#10;Emits JSON to stdout:&#10;event, method, path, status&#10;duration_ms, request_id&#10;client_ip, key_prefix&#10;Tests: 13 integration">
+        <div class="mw-tests">13 int tests</div>
+        <div class="mw-name">AuditLog</div>
+        <div class="mw-detail">JSON → stdout</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+
+      <!-- Request ID -->
+      <div class="mw-block c-reqid" data-tip="Reads x-request-id header&#10;Generates UUID4 if absent&#10;Attaches to request.state&#10;Echoes in response header&#10;Tests: 2 integration">
+        <div class="mw-tests">2 int tests</div>
+        <div class="mw-name">RequestId</div>
+        <div class="mw-detail">UUID4 / passthrough</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CONNECTOR to Router -->
+  <div class="flex-col mt8">
+    <div class="connector">↓</div>
+    <div style="margin: 2px 0; font-size:10px; color:#8b949e;">all middleware passed</div>
+    <div class="connector">↓</div>
+  </div>
+
+  <!-- ROW 2: Router -->
+  <div class="mt8" style="display:flex; align-items:flex-start; gap:24px; flex-wrap:wrap; justify-content:center;">
+
+    <!-- Router -->
+    <div class="router-block" data-tip="FastAPI router dispatches by&#10;method + path pattern">
+      <div class="router-title">② ROUTER</div>
+      <div class="route-item">
+        <span class="route-method get">GET</span>
+        <span class="route-path">/health</span>
+        <span class="route-dest">HealthCheck →</span>
+      </div>
+      <div class="route-item">
+        <span class="route-method get">GET</span>
+        <span class="route-path">/version</span>
+        <span class="route-dest">VersionInfo →</span>
+      </div>
+      <div class="route-item">
+        <span class="route-method post">POST</span>
+        <span class="route-path">/v1/chat/completions</span>
+        <span class="route-dest">InferenceService →</span>
+      </div>
+      <div class="route-item">
+        <span class="route-method post">POST</span>
+        <span class="route-path">/v1/completions</span>
+        <span class="route-dest">InferenceService →</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONNECTOR to InferenceService -->
+  <div class="flex-col mt8">
+    <div class="connector">↓</div>
+    <div style="margin: 2px 0; font-size:10px; color:#8b949e;">/v1/* routes only</div>
+    <div class="connector">↓</div>
+  </div>
+
+  <!-- ROW 3: InferenceService + Backend -->
+  <div class="service-row mt8" style="justify-content:center;">
+
+    <!-- InferenceService -->
+    <div class="service-block">
+      <div class="svc-title">③ INFERENCE SERVICE</div>
+      <div class="svc-step step-tokens">
+        <span class="svc-icon">🔢</span>
+        <span class="svc-name">Fill defaults</span>
+        <span style="margin-left:auto; font-size:10px; color:#8b949e;">model + max_tokens</span>
+      </div>
+      <div class="svc-step step-tokens">
+        <span class="svc-icon">⚠️</span>
+        <span class="svc-name">Enforce max_tokens limit</span>
+        <span class="svc-err">→ 400</span>
+      </div>
+      <div class="svc-step step-guard">
+        <span class="svc-icon">🛡️</span>
+        <span class="svc-name">PromptInjectionGuard</span>
+        <span class="svc-err">→ 400</span>
+      </div>
+      <div class="svc-step step-call" style="margin-top:4px;">
+        <span class="svc-icon">🔁</span>
+        <span class="svc-name">Backend call + timeout</span>
+        <span class="svc-err" style="color:#f85149;">→ 503</span>
+      </div>
+      <div class="svc-step step-output">
+        <span class="svc-icon">🔍</span>
+        <span class="svc-name">OutputGuard</span>
+        <span class="svc-err">→ 503</span>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; font-size:20px; color:#3d444d; margin: 0 8px;">→</div>
+
+    <!-- Backend -->
+    <div class="backend-block">
+      <div class="be-title">④ BACKENDS</div>
+      <div class="be-item">
+        <span class="be-icon">⚡</span>
+        <div>
+          <div class="be-name">OpenAICompatible</div>
+          <div class="be-sub">Upstream LLM API</div>
+        </div>
+        <span class="be-tag tag-prod">PROD</span>
+      </div>
+      <div class="be-item" style="margin-top:4px;">
+        <span class="be-icon">🧪</span>
+        <div>
+          <div class="be-name">FakeBackend</div>
+          <div class="be-sub">In-memory stub</div>
+        </div>
+        <span class="be-tag tag-test">TEST</span>
+      </div>
+      <div style="font-size:10px; color:#8b949e; margin-top:8px; text-align:center;">
+        Factory selects via<br><code style="color:#79c0ff;">LLM_BACKEND</code> env
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONNECTOR to Response -->
+  <div class="flex-col mt8">
+    <div class="connector">↓</div>
+    <div style="margin: 2px 0; font-size:10px; color:#8b949e;">response travels back through middleware (AuditLog records)</div>
+    <div class="connector">↓</div>
+  </div>
+
+  <!-- ROW 4: Response codes -->
+  <div style="display:flex; justify-content:center; gap:24px; flex-wrap:wrap; margin-top:8px;">
+
+    <div class="response-block">
+      <div class="resp-title">⑤ RESPONSE</div>
+      <div>
+        <span class="resp-code resp-200">200 OK</span>
+        <span class="resp-code resp-400">400 Bad Request</span>
+        <span class="resp-code resp-401">401 Unauthorized</span>
+      </div>
+      <div style="margin-top:4px;">
+        <span class="resp-code resp-413">413 Too Large</span>
+        <span class="resp-code resp-503">503 Unavailable</span>
+      </div>
+    </div>
+
+    <div class="audit-path">
+      <div class="ap-title">Audit Log Events (stdout JSON)</div>
+      <div class="audit-event"><span>request</span> — every HTTP call (INFO)</div>
+      <div class="audit-event"><span>auth_failed</span> — bad / missing key (WARN)</div>
+      <div class="audit-event"><span>request_too_large</span> — Content-Length (WARN)</div>
+      <div style="font-size:10px; color:#3d444d; margin-top:6px;">
+        Fields: event, method, path, status,<br>
+        duration_ms, request_id, client_ip, key_prefix
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ═══ SECURITY DETAIL ════════════════════════════════════ -->
+<div class="pipeline-card" style="margin-top:0;">
+  <div class="section-label">Security Guards Detail</div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+    <div>
+      <div style="font-size:11px; font-weight:700; color:#f85149; margin-bottom:8px;">PromptInjectionGuard (input)</div>
+      <div style="font-size:11px; color:#8b949e; line-height:1.8;">
+        • Text length &gt; max_chars → reject<br>
+        • Regex patterns: <code style="color:#79c0ff;">ignore previous instructions</code>, <code style="color:#79c0ff;">reveal system prompt</code>, tool call override, img exfil…<br>
+        • Typoglycemia detection (scrambled keywords)<br>
+        • Base64-decoded injection scan<br>
+        <span style="color:#58a6ff;">8 unit tests</span>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px; font-weight:700; color:#bc8cff; margin-bottom:8px;">OutputGuard (response)</div>
+      <div style="font-size:11px; color:#8b949e; line-height:1.8;">
+        • Output length &gt; max_chars → reject<br>
+        • Detects leaked system prompt (<code style="color:#79c0ff;">SYSTEM: You are</code>)<br>
+        • Detects leaked API keys in output<br>
+        • Detects img exfil markup in output<br>
+        <span style="color:#58a6ff;">included in 8 unit tests</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="text-align:center; font-size:10px; color:#3d444d; margin-top:16px;">
+  Generated from live test run — 87 / 87 ✓ &nbsp;|&nbsp; LLM Inference Gateway
+</div>
+
+</body>
+</html>

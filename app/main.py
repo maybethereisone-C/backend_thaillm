@@ -6,46 +6,32 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes_health import router as health_router
 from app.api.routes_inference import router as inference_router
+from app.core.audit import configure_logging
 from app.core.errors import AppError
 from app.core.settings import get_settings
-from app.mcp_server import create_mcp_server
 from app.middleware import (
     ApiKeyAuthMiddleware,
     AuditLogMiddleware,
     BodySizeLimitMiddleware,
-    InMemoryRateLimitMiddleware,
-    OriginValidationMiddleware,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     settings = get_settings()
-    mcp_app = None
-    if settings.mcp_enabled:
-        mcp_app = create_mcp_server(settings).http_app(path="/")
 
-    app = FastAPI(
-        title="ThaiLLM Backend API",
-        version=settings.api_version,
-        lifespan=mcp_app.lifespan if mcp_app else None,
-    )
+    app = FastAPI(title="LLM Inference Gateway", version=settings.api_version)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(AuditLogMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         ApiKeyAuthMiddleware,
         api_keys=settings.api_keys,
-        protected_prefixes=("/v1", "/mcp"),
-    )
-    app.add_middleware(
-        OriginValidationMiddleware,
-        allowed_origins=settings.allowed_origins,
-        protected_prefixes=("/mcp",),
+        protected_prefixes=("/v1",),
     )
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.request_body_limit_bytes)
-    app.add_middleware(InMemoryRateLimitMiddleware, requests_per_minute=settings.rate_limit_per_minute)
     if settings.allowed_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -87,8 +73,6 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(inference_router)
-    if mcp_app:
-        app.mount("/mcp", mcp_app)
     return app
 
 

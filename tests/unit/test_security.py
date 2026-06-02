@@ -1,7 +1,7 @@
 from app.core.security import OutputGuard, PromptInjectionGuard
 
 
-def test_prompt_guard_allows_normal_thai_text() -> None:
+def test_prompt_guard_allows_normal_unicode_text() -> None:
     guard = PromptInjectionGuard(max_chars=200)
 
     result = guard.inspect_text("สวัสดี ช่วยอธิบายระบบ backend แบบสั้นๆ")

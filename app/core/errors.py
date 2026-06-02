@@ -21,11 +21,6 @@ class AuthenticationError(AppError):
     code = "authentication_failed"
 
 
-class RateLimitError(AppError):
-    status_code = status.HTTP_429_TOO_MANY_REQUESTS
-    code = "rate_limit_exceeded"
-
-
 class BackendUnavailableError(AppError):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     code = "backend_unavailable"

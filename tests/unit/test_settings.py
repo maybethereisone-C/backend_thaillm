@@ -5,7 +5,7 @@ from app.core.settings import Settings
 
 
 def test_openai_compatible_backend_requires_upstream_base_url() -> None:
-    with pytest.raises(ValidationError, match="THAILLM_UPSTREAM_BASE_URL"):
+    with pytest.raises(ValidationError, match="LLM_UPSTREAM_BASE_URL"):
         Settings(backend="openai_compatible", upstream_base_url=None)
 
 

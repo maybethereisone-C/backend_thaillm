@@ -18,7 +18,7 @@ class Usage(BaseModel):
 
 
 class CompletionRequest(BaseModel):
-    model: str = "ThaiLLM/ThaiLLM-8B-SFT-IQ"
+    model: str = "default"
     prompt: str = Field(min_length=1)
     max_tokens: int | None = Field(default=None, gt=0)
     temperature: float = Field(default=0.4, ge=0.0, le=2.0)
@@ -38,7 +38,7 @@ class CompletionResponse(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str = "ThaiLLM/ThaiLLM-8B-SFT-IQ"
+    model: str = "default"
     messages: list[ChatMessage] = Field(min_length=1)
     max_tokens: int | None = Field(default=None, gt=0)
     temperature: float = Field(default=0.4, ge=0.0, le=2.0)

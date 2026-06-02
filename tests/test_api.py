@@ -26,7 +26,7 @@ def test_version() -> None:
     assert body["backend"] == "fake"
 
 
-def test_chat_completion_accepts_thai() -> None:
+def test_chat_completion_accepts_unicode() -> None:
     client = TestClient(create_app())
 
     response = client.post(
