@@ -122,7 +122,7 @@ Response:
 }
 ```
 
-`model` is optional in the request; when omitted the server uses `LLM_MODEL_ID`. Errors return a structured body: `{"error": {"code": ..., "message": ..., "request_id": ...}}`.
+`model` is optional in the request; when omitted it defaults to `default`. `LLM_MODEL_ID` sets the model name reported by `/version` and is sent to the upstream only when a request supplies an empty `model`. Errors return a structured body: `{"error": {"code": ..., "message": ..., "request_id": ...}}`.
 
 Interactive API docs are served at `/docs` (Swagger UI) and `/redoc`.
 
@@ -147,7 +147,7 @@ All settings use the `LLM_` prefix. Set them via `.env` or environment variables
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `LLM_BACKEND` | `fake` | `fake` or `openai_compatible` |
-| `LLM_MODEL_ID` | `default` | Sent to the upstream as the model name |
+| `LLM_MODEL_ID` | `default` | Model name reported by `/version`; sent upstream when a request supplies an empty `model` |
 | `LLM_UPSTREAM_BASE_URL` | — | Required when backend is `openai_compatible` |
 | `LLM_UPSTREAM_API_KEY` | — | Bearer token for the upstream |
 | `LLM_REQUEST_TIMEOUT_SECONDS` | `60` | Upstream request timeout |

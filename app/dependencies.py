@@ -1,8 +1,7 @@
 from functools import lru_cache
 
-from app.backends import InferenceBackend
 from app.backends.factory import build_backend
-from app.core.settings import Settings, get_settings
+from app.core.settings import get_settings
 from app.services.inference_service import InferenceService
 
 

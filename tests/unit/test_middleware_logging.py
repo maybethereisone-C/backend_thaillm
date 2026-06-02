@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-import pytest
-
 from app.middleware import _key_prefix
 
 
