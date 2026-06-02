@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     trusted_hosts: Annotated[list[str], NoDecode] = Field(default_factory=list)
     prompt_guard_enabled: bool = True
 
+    # competition endpoints
+    audit_trail_dir: str = "audit_trails"
+    agent_db_path: str = ""
+    agent_src_path: str = ""
+    thaillm_base_url: AnyHttpUrl | None = None
+    thaillm_model_id: str = ""
+    thaillm_api_key: SecretStr | None = None
+
     @field_validator("api_keys", "allowed_origins", "trusted_hosts", mode="before")
     @classmethod
     def parse_csv(cls, value: list[str] | str | None) -> list[str]:
@@ -34,7 +42,7 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
-    @field_validator("upstream_base_url", mode="before")
+    @field_validator("upstream_base_url", "thaillm_base_url", mode="before")
     @classmethod
     def blank_url_to_none(cls, value: str | None) -> str | None:
         if value == "":

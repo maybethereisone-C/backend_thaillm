@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes_health import router as health_router
 from app.api.routes_inference import router as inference_router
+from app.api.routes_competition import router as competition_router
 from app.core.audit import configure_logging
 from app.core.errors import AppError
 from app.core.settings import get_settings
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(inference_router)
+    app.include_router(competition_router)
     return app
 
 

@@ -126,6 +126,35 @@ Response:
 
 Interactive API docs are served at `/docs` (Swagger UI) and `/redoc`.
 
+## Competition Endpoint (ThaiLLM back-test)
+
+`POST /agent/thaillm` — no API key required; the scoring server calls this directly.
+
+**Request**
+```json
+{"question": "ราคา MSRP ของ NT-LT-001 คือเท่าไหร่"}
+```
+
+**Response**
+```json
+{"id": "550e8400-e29b-41d4-a716-446655440000", "answer": "45900", "total_output_token": 312}
+```
+
+- `id` — UUID generated per request; used as the audit trail filename
+- `answer` — agent answer in Thai or English
+- `total_output_token` — output tokens consumed (used in cost scoring)
+
+Each request writes `{id}.txt` (the agent reasoning trace) to `LLM_AUDIT_TRAIL_DIR`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LLM_AUDIT_TRAIL_DIR` | `audit_trails` | Directory for `{id}.txt` audit files |
+| `LLM_AGENT_DB_PATH` | `""` | Path to `fahmai_rag.db` |
+| `LLM_AGENT_SRC_PATH` | `""` | Path to `fahmai_db_agent/src` containing `agent.py` |
+| `LLM_THAILLM_BASE_URL` | — | ThaiLLM upstream base URL (OpenAI-compatible) |
+| `LLM_THAILLM_MODEL_ID` | `""` | ThaiLLM model name |
+| `LLM_THAILLM_API_KEY` | — | ThaiLLM API key |
+
 ## Make Targets
 
 | Target | What it does |
