@@ -2,7 +2,7 @@
 
 UV := uv
 HOST ?= 127.0.0.1
-PORT ?= 8000
+PORT ?= 18000
 IMAGE ?= llm-gateway
 
 help:

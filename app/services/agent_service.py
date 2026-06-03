@@ -12,10 +12,13 @@ _IMPORT_LOCK uses threading.Lock because module import runs in a thread.
 """
 import asyncio
 import json
+import logging
 import threading
 import time
 import types
 from dataclasses import dataclass
+
+_log = logging.getLogger("llm.thaillm")
 
 _DEFAULT_TEMPERATURE = 0.0
 _DEFAULT_MAX_TOKENS = 2500
@@ -95,6 +98,15 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
         }
         if config.api_key:
             headers["Authorization"] = f"Bearer {config.api_key}"
+        _log.info(json.dumps({
+            "event": "thaillm_request",
+            "stage": "http",
+            "url": url,
+            "model": model,
+            "api_key_prefix": config.api_key[:6] if config.api_key else None,
+            "messages": len(messages),
+            "timeout": timeout,
+        }))
         import urllib.error as _err
         data = None
         for _attempt in range(_MAX_RETRIES + 1):
@@ -105,14 +117,27 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
             )
             try:
                 with _req.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+                    _status = getattr(resp, "status", 200)
                     data = json.loads(resp.read().decode("utf-8"))
+                _log.info(json.dumps({
+                    "event": "thaillm_response", "stage": "http",
+                    "attempt": _attempt, "status": _status,
+                }))
                 break
             except _err.HTTPError as exc:
+                _log.warning(json.dumps({
+                    "event": "thaillm_http_error", "stage": "http",
+                    "attempt": _attempt, "code": exc.code,
+                }))
                 if exc.code in _RETRY_STATUS and _attempt < _MAX_RETRIES:
                     time.sleep(2 ** _attempt)
                     continue
                 raise
             except (_err.URLError, OSError) as exc:
+                _log.warning(json.dumps({
+                    "event": "thaillm_conn_error", "stage": "http",
+                    "attempt": _attempt, "error": str(exc),
+                }))
                 if _attempt < _MAX_RETRIES:
                     time.sleep(2 ** _attempt)
                     continue

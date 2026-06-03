@@ -119,6 +119,135 @@ def _parse_action(text):
             return None
 
 
+# -- finalization guards: raw-dump (Phase 1), sufficiency (Phase 5), coverage+vote (Phase 8) --
+
+_REFUSAL = "ไม่พบข้อมูลที่ตอบคำถามนี้ในชุดข้อมูล"
+_SYNTH_INSTR = (
+    "Reply with ONLY the final answer in PLAIN TEXT (match the question's language) — "
+    'NO JSON, no {"action":...}. Use the data already gathered above and state the exact '
+    "numbers/ids asked. If a value is truly absent, refuse in the required format."
+)
+_DUMP_MARKERS = ('"columns"', '"rows"', '"row_count"', "chunk_id", "policy_version_id",
+                 "source_name", '"action"', "distinct_values", '"duplicates"')
+# code-style ids that contain a digit (NT-LT-001, V-007, POL-EXEC-2026-Q1-001). dates excluded
+# on purpose — Buddhist/Gregorian reformatting would cause false refusals.
+_ANCHOR_RE = re.compile(r"\b[A-Za-z]{1,5}[-_][A-Za-z0-9\-_]*\d[A-Za-z0-9\-_]*\b")
+_PART_RE = re.compile(r"\(\s*[1-9]\s*\)|(?<![0-9])[1-9]\s*\)|[กขค]\s*[.\)]|ข้อ\s*[1-9]")
+
+
+def _is_raw_dump(text):
+    """True if the text looks like a leaked tool result rather than a prose answer."""
+    t = (text or "").strip()
+    if not t:
+        return True
+    if t[:1] in "{[":
+        return True
+    return any(m in t for m in _DUMP_MARKERS)
+
+
+def _flatten_obs(obs_str):
+    """Render an observation JSON as compact 'col=val; col=val' evidence (numbers preserved,
+    JSON dropped). Used to re-synthesize a prose answer — never returned as the answer itself."""
+    try:
+        obj = json.loads(obs_str)
+    except (json.JSONDecodeError, TypeError):
+        return (obs_str or "")[:1200]
+    rows = obj.get("rows") if isinstance(obj, dict) else None
+    cols = obj.get("columns") if isinstance(obj, dict) else None
+    lines = []
+    if isinstance(rows, list):
+        for r in rows[:20]:
+            if isinstance(r, dict):
+                lines.append("; ".join(f"{k}={v}" for k, v in r.items()))
+            elif isinstance(r, list) and cols:
+                lines.append("; ".join(f"{c}={v}" for c, v in zip(cols, r)))
+            else:
+                lines.append(str(r))
+    return (" | ".join(lines)[:1500]) if lines else (obs_str or "")[:1200]
+
+
+def _count_parts(question):
+    """Number of explicitly numbered sub-parts in the question ((1)(2), 1) 2), ก./ข./ค., ข้อ N)."""
+    return len({m for m in _PART_RE.findall(question or "")})
+
+
+def _covers_parts(text, n):
+    """Cheap check that an answer addresses n sub-parts (markers or n content segments)."""
+    if n < 2:
+        return True
+    t = text or ""
+    if len({m for m in _PART_RE.findall(t)}) >= n:
+        return True
+    segs = [s for s in re.split(r"[\n;]|(?<=[0-9])\)|ข้อ", t) if s.strip()]
+    return len(segs) >= n
+
+
+def _evidence_supports(question, transcript):
+    """Phase 5: if the question names code-style ids and NONE appear anywhere in the run
+    transcript (queries + observations), the answer is unsupported. Anchorless questions pass."""
+    anchors = {a for a in _ANCHOR_RE.findall(question or "")}
+    if not anchors:
+        return True
+    return any(a in transcript for a in anchors)
+
+
+def _ask(chat, messages, model, instruction, temperature=0.0):
+    """One plain-text synthesis turn; returns '' on any upstream error."""
+    try:
+        out = chat(messages + [{"role": "user", "content": instruction}],
+                   model=model, temperature=temperature)
+        return (out or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _self_consistent(chat, messages, model, seed):
+    """Phase 8: sample 3 plain-text finals at temp 0.4 and return the majority (normalized);
+    no majority -> the deterministic seed. Downside is bounded to the temp-0 answer."""
+    cands = []
+    for _ in range(3):
+        c = _ask(chat, messages, model, _SYNTH_INSTR, temperature=0.4)
+        if c and not _is_raw_dump(c):
+            cands.append(c)
+    if not cands:
+        return seed
+    groups = {}
+    for c in cands:
+        key = re.sub(r"\s+", " ", c.lower()).strip()
+        groups.setdefault(key, []).append(c)
+    best = max(groups.values(), key=len)
+    return best[0] if len(best) >= 2 else seed
+
+
+def _finalize(chat, messages, model, question, candidate, transcript, last_good):
+    """Turn a candidate answer into a safe final: sufficiency gate -> dump guard / re-synth ->
+    part coverage -> self-consistency vote -> never emit a raw dump."""
+    # Phase 5: question names ids the run never touched -> unsupported, refuse (no model call)
+    if not _evidence_supports(question, transcript):
+        return _REFUSAL
+    cand = (candidate or "").strip()
+    parts = _count_parts(question)
+    # Phase 1: leaked tool result (or empty) -> re-synthesize once from flattened evidence
+    if _is_raw_dump(cand):
+        msgs = messages
+        if last_good:
+            msgs = messages + [{"role": "user", "content": "Gathered evidence: " + _flatten_obs(last_good)}]
+        cand = _ask(chat, msgs, model, _SYNTH_INSTR)
+    # Phase 8: multi-part questions must cover every part
+    if parts >= 2 and not _covers_parts(cand, parts):
+        instr = _SYNTH_INSTR + f" The question has {parts} parts — cover ALL {parts}, in order."
+        c2 = _ask(chat, messages, model, instr)
+        if c2 and not _is_raw_dump(c2):
+            cand = c2
+    # Phase 8: self-consistency vote on the final synthesis (only meaningful with evidence)
+    if last_good:
+        cand = _self_consistent(chat, messages, model, cand)
+    # Phase 1 final guard: still a dump/empty -> clean refusal, never raw JSON
+    if _is_raw_dump(cand):
+        return _REFUSAL
+    return cand
+
+
 def run_agent(question, db_path, model="gemma3:4b", max_steps=8, verbose=False):
     tools = Tools(db_path)
     try:
@@ -137,6 +266,7 @@ def _run_agent_with_tools(tools, question, model="gemma3:4b", max_steps=6, verbo
     repeat_count = {}  # action signature -> times executed (loop-discipline guard)
     actions_done = 0  # data actions taken; the agent may not answer before consulting data
     last_good = None  # last non-empty observation, for fallback synthesis
+    transcript = []   # queries + observations, for the Phase 5 anchor sufficiency check
     for step in range(max_steps):
         try:
             raw = chat(messages, model=model)
@@ -162,7 +292,8 @@ def _run_agent_with_tools(tools, question, model="gemma3:4b", max_steps=6, verbo
                     "give final. Never answer from the question's text alone."})
                 trace.append({"step": step, "blocked": "final-before-lookup"})
                 continue
-            answer = str(act.get("answer", "")).strip()
+            answer = _finalize(chat, messages, model, question,
+                               str(act.get("answer", "")), " ".join(transcript), last_good)
             trace.append({"step": step, "action": "final"})
             break
         if a == "sql":
@@ -225,29 +356,15 @@ def _run_agent_with_tools(tools, question, model="gemma3:4b", max_steps=6, verbo
             nudge += ("\nNOTE: you already ran this exact action — do NOT repeat it. Use the result "
                       "above; if it was empty, try a DIFFERENT tool/keywords, otherwise output final.")
 
+        transcript.append(raw)
+        transcript.append(obs_str)
         messages.append({"role": "assistant", "content": raw[:500]})
         messages.append({"role": "user", "content": nudge})
         if repeat_count[sig] >= 3:  # same action three times -> stop wasting steps, force synthesis
             break
     if answer is None:
-        # forced finalization: synthesize from what was gathered instead of dumping raw data
-        messages.append({"role": "user", "content":
-            "Stop searching. Reply with ONLY the final answer in PLAIN TEXT (Thai or English to match "
-            "the question) — NO JSON, NO {\"action\":...}. Cover every numbered part using the data "
-            "gathered above; if a value is truly absent use the refusal format."})
-        try:
-            raw = chat(messages, model=model).strip()
-            fa = _parse_action(raw)
-            if fa and "answer" in fa:
-                answer = str(fa["answer"]).strip()
-            elif raw.startswith("{"):  # leaked a tool call -> render gathered data so it's never empty
-                answer = f"จากข้อมูลที่พบในระบบ: {last_good}" if last_good else "ไม่พบข้อมูลที่ตอบได้ในชุดข้อมูล"
-            else:
-                answer = raw
-        except Exception:  # noqa: BLE001
-            answer = f"จากข้อมูลที่พบในระบบ: {last_good}" if last_good else "ไม่พบข้อมูลที่ตอบได้ในชุดข้อมูล"
-        if not (answer or "").strip():
-            answer = f"จากข้อมูลที่พบในระบบ: {last_good}" if last_good else "ไม่พบข้อมูลที่ตอบได้ในชุดข้อมูล"
+        # forced finalization: re-synthesize prose from gathered evidence; never dump raw rows
+        answer = _finalize(chat, messages, model, question, "", " ".join(transcript), last_good)
     return {"answer": answer, "trace": trace}
 
 
