@@ -41,3 +41,4 @@ audit_trails/
 
 # local eval harness — keep out of the public repo
 scripts/
+RUN_ON_B200.md
