@@ -20,4 +20,4 @@ def test_version() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["api_version"] == "0.1.0"
-    assert "model" in body
+    assert "model" not in body

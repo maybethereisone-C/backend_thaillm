@@ -35,6 +35,13 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
+    @field_validator("allowed_origins")
+    @classmethod
+    def no_wildcard_with_credentials(cls, value: list[str]) -> list[str]:
+        if "*" in value:
+            raise ValueError("Wildcard origin cannot be combined with credentialed CORS")
+        return value
+
     @field_validator("thaillm_base_url", mode="before")
     @classmethod
     def blank_url_to_none(cls, value: str | None) -> str | None:

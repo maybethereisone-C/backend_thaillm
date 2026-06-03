@@ -13,7 +13,4 @@ async def health() -> HealthResponse:
 
 @router.get("/version", response_model=VersionResponse)
 async def version(settings: Settings = Depends(get_settings)) -> VersionResponse:
-    return VersionResponse(
-        api_version=settings.api_version,
-        model=settings.thaillm_model_id,
-    )
+    return VersionResponse(api_version=settings.api_version)

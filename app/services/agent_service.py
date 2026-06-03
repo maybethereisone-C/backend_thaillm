@@ -160,7 +160,10 @@ async def run_agent(question: str, config: AgentConfig) -> tuple[str, int, str]:
                 agent_module.chat = orig_agent
                 ollama_module.chat = orig_client
 
-    result = await asyncio.to_thread(_invoke)
+    result = await asyncio.wait_for(
+        asyncio.to_thread(_invoke),
+        timeout=config.timeout * (_MAX_RETRIES + 1) + 10,
+    )
     answer = str(result.get("answer", ""))
     trace_text = json.dumps(result.get("trace", []), ensure_ascii=False)
     return answer, token_counter[0], trace_text

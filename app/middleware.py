@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Callable
 from time import perf_counter
 from uuid import uuid4
@@ -9,9 +10,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.audit import audit_logger
 
+_REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
+
+
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        request_id = request.headers.get("x-request-id") or str(uuid4())
+        raw = request.headers.get("x-request-id", "")
+        request_id = raw if _REQUEST_ID_RE.match(raw) else str(uuid4())
         request.state.request_id = request_id
         response = await call_next(request)
         response.headers["x-request-id"] = request_id

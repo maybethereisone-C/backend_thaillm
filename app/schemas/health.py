@@ -7,4 +7,3 @@ class HealthResponse(BaseModel):
 
 class VersionResponse(BaseModel):
     api_version: str
-    model: str
