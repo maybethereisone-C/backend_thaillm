@@ -23,6 +23,9 @@ FastAPI inference gateway with OpenAI-compatible endpoints, prompt-injection gua
 uv sync
 cp .env.example .env
 # edit .env: set LLM_UPSTREAM_BASE_URL and LLM_UPSTREAM_API_KEY
+# for the /agent/thaillm back-test also set LLM_THAILLM_BASE_URL, LLM_THAILLM_MODEL_ID,
+#   LLM_THAILLM_API_KEY and the agent paths (LLM_AGENT_SRC_PATH, LLM_AGENT_DB_PATH).
+#   .env.example lists every key with comments — see "Competition Endpoint" below.
 ```
 
 For local testing without an upstream, set `LLM_BACKEND=fake` in `.env`.
