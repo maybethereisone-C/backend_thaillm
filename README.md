@@ -88,6 +88,7 @@ All settings use the `LLM_` prefix. Set via `.env` or environment variables.
 | `LLM_AGENT_SRC_PATH` | `""` | Directory containing `agent.py`, `tools.py`, … |
 | `LLM_AGENT_DB_PATH` | `""` | Path to the DuckDB database file |
 | `LLM_AUDIT_TRAIL_DIR` | `audit_trails` | Directory for `{id}.txt` audit files |
+| `LLM_RESULTS_LOG_DIR` | `logs` | Directory for `responses.jsonl` + `tools.jsonl` |
 | `LLM_REQUEST_TIMEOUT_SECONDS` | `60` | Upstream request timeout |
 | `LLM_ALLOWED_ORIGINS` | — | CORS origin allowlist |
 | `LLM_TRUSTED_HOSTS` | — | Reject requests whose `Host` is not in this list |

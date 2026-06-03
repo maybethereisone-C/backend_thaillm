@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     prompt_guard_enabled: bool = True
 
     audit_trail_dir: str = "audit_trails"
+    results_log_dir: str = "logs"
     agent_db_path: str = ""
     agent_src_path: str = ""
     # Local OpenAI-compatible model server (e.g. llama.cpp llama-server) that
