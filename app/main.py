@@ -5,13 +5,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.routes_health import router as health_router
-from app.api.routes_inference import router as inference_router
 from app.api.routes_competition import router as competition_router
 from app.core.audit import configure_logging
 from app.core.errors import AppError
 from app.core.settings import get_settings
 from app.middleware import (
-    ApiKeyAuthMiddleware,
     AuditLogMiddleware,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
@@ -23,14 +21,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(title="LLM Inference Gateway", version=settings.api_version)
-    # add_middleware prepends, so the last added runs outermost (first inbound).
-    # Order: RequestId (outermost) -> AuditLog -> SecurityHeaders -> ApiKeyAuth (innermost),
-    # so a 401 still carries a request id and is audited.
-    app.add_middleware(
-        ApiKeyAuthMiddleware,
-        api_keys=settings.api_keys,
-        protected_prefixes=("/v1",),
-    )
+    # add_middleware prepends; last added runs outermost (first inbound).
+    # Order: RequestId (outermost) -> AuditLog -> SecurityHeaders (innermost).
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(AuditLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
@@ -40,7 +32,7 @@ def create_app() -> FastAPI:
             allow_origins=settings.allowed_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST"],
-            allow_headers=["authorization", "content-type", "x-api-key", "x-request-id"],
+            allow_headers=["content-type", "x-request-id"],
         )
     if settings.trusted_hosts:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
@@ -74,7 +66,6 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health_router)
-    app.include_router(inference_router)
     app.include_router(competition_router)
     return app
 

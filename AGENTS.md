@@ -21,9 +21,6 @@ make cover               # tests + coverage report
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `LLM_BACKEND` | yes | `openai_compatible` or `fake` |
-| `LLM_UPSTREAM_BASE_URL` | if openai_compatible | Upstream inference endpoint |
-| `LLM_UPSTREAM_API_KEY` | no | Bearer token for upstream |
 | `LLM_MODEL_ID` | no | Model ID forwarded to upstream |
 | `LLM_API_KEYS` | no | Comma-separated gateway API keys |
 | `LLM_TRUSTED_HOSTS` | no | Comma-separated allowed hostnames |
@@ -89,8 +86,6 @@ Optional: CORSMiddleware (if `LLM_ALLOWED_ORIGINS` set), TrustedHostMiddleware (
 |---|---|---|---|
 | GET | `/health` | none | Liveness check |
 | GET | `/version` | none | Service version |
-| POST | `/v1/completions` | API key | Proxied completions with guards |
-| POST | `/v1/chat/completions` | API key | Proxied chat completions with guards |
 | POST | `/agent/thaillm` | none | ReAct agent back-test (competition scoring) |
 
 ## Rules

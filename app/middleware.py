@@ -8,8 +8,6 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.audit import audit_logger
-from app.core.security import verify_api_key
-
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -29,32 +27,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("cache-control", "no-store")
         return response
 
-
-class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, *, api_keys: list[str], protected_prefixes: tuple[str, ...]) -> None:
-        super().__init__(app)
-        self._api_keys = api_keys
-        self._protected_prefixes = protected_prefixes
-
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if self._requires_auth(request.url.path):
-            try:
-                verify_api_key(request, self._api_keys)
-            except Exception:
-                audit_logger.warning(json.dumps({
-                    "event": "auth_failed",
-                    "path": request.url.path,
-                    "client_ip": request.client.host if request.client else None,
-                    "request_id": getattr(request.state, "request_id", None),
-                }))
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"error": {"code": "authentication_failed", "message": "valid API key required"}},
-                )
-        return await call_next(request)
-
-    def _requires_auth(self, path: str) -> bool:
-        return bool(self._api_keys) and any(path.startswith(prefix) for prefix in self._protected_prefixes)
 
 
 class AuditLogMiddleware(BaseHTTPMiddleware):

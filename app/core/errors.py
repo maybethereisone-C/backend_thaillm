@@ -15,12 +15,3 @@ class RequestPolicyError(AppError):
     status_code = status.HTTP_400_BAD_REQUEST
     code = "request_policy_violation"
 
-
-class AuthenticationError(AppError):
-    status_code = status.HTTP_401_UNAUTHORIZED
-    code = "authentication_failed"
-
-
-class BackendUnavailableError(AppError):
-    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    code = "backend_unavailable"

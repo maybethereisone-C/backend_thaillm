@@ -9,10 +9,7 @@ def test_health() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "ok"
-    assert body["backend"]["backend"] == "fake"
-    assert body["backend"]["ready"] is True
+    assert response.json() == {"status": "ok"}
 
 
 def test_version() -> None:
@@ -23,34 +20,4 @@ def test_version() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["api_version"] == "0.1.0"
-    assert body["backend"] == "fake"
-
-
-def test_chat_completion_accepts_unicode() -> None:
-    client = TestClient(create_app())
-
-    response = client.post(
-        "/v1/chat/completions",
-        json={
-            "messages": [
-                {"role": "user", "content": "สวัสดี อธิบาย LLM แบบสั้นๆ"}
-            ]
-        },
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["choices"][0]["message"]["role"] == "assistant"
-    assert "สวัสดี" in body["choices"][0]["message"]["content"]
-
-
-def test_completion_accepts_prompt() -> None:
-    client = TestClient(create_app())
-
-    response = client.post(
-        "/v1/completions",
-        json={"prompt": "Python OOP คืออะไร"},
-    )
-
-    assert response.status_code == 200
-    assert "Python OOP" in response.json()["choices"][0]["text"]
+    assert "model" in body

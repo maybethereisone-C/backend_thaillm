@@ -1,11 +1,8 @@
 import base64
 import re
-import secrets
 from dataclasses import dataclass
 
-from fastapi import Request
-
-from app.core.errors import AuthenticationError, RequestPolicyError
+from app.core.errors import RequestPolicyError
 
 
 @dataclass(frozen=True)
@@ -101,29 +98,3 @@ class OutputGuard:
         result = self.inspect_text(value)
         if not result.allowed:
             raise RequestPolicyError(result.reason or "response rejected by output guard")
-
-
-def extract_api_key(request: Request) -> str | None:
-    header_key = request.headers.get("x-api-key")
-    if header_key:
-        return header_key
-
-    authorization = request.headers.get("authorization")
-    if not authorization:
-        return None
-
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        return None
-    return token
-
-
-def verify_api_key(request: Request, allowed_keys: list[str]) -> None:
-    if not allowed_keys:
-        return
-
-    provided = extract_api_key(request)
-    if provided and any(secrets.compare_digest(provided, key) for key in allowed_keys):
-        return
-
-    raise AuthenticationError("valid API key required")

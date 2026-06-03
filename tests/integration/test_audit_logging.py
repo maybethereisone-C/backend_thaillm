@@ -99,8 +99,7 @@ def test_request_event_key_prefix_none_when_no_key(caplog):
     assert ev["key_prefix"] is None
 
 
-def test_request_event_key_prefix_truncated_not_full_key(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "full-secret-key-here")
+def test_request_event_key_prefix_truncated_not_full_key(caplog):
     client = TestClient(create_app())
     with caplog.at_level(logging.INFO, logger="llm"):
         client.get("/health", headers={"x-api-key": "full-secret-key-here"})
@@ -134,16 +133,6 @@ def test_request_event_is_valid_json_string(caplog):
         assert isinstance(parsed, dict)
 
 
-def test_request_event_emitted_for_post_endpoint(caplog):
-    client = TestClient(create_app())
-    with caplog.at_level(logging.INFO, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    ev = _events(caplog, "request")[0]
-    assert ev["method"] == "POST"
-    assert ev["path"] == "/v1/completions"
-
-
 def test_one_request_event_per_http_call(caplog):
     client = TestClient(create_app())
     with caplog.at_level(logging.INFO, logger="llm"):
@@ -152,95 +141,3 @@ def test_one_request_event_per_http_call(caplog):
 
     events = _events(caplog, "request")
     assert len(events) == 2
-
-
-# ── ApiKeyAuthMiddleware: auth_failed ─────────────────────────────────────────
-
-def test_auth_failed_logged_when_no_key_provided(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "secret")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    assert len(_events(caplog, "auth_failed")) == 1
-
-
-def test_auth_failed_logged_when_wrong_key_provided(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "correct-key")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", headers={"x-api-key": "wrong-key"}, json={"prompt": "hello"})
-
-    assert len(_events(caplog, "auth_failed")) == 1
-
-
-def test_auth_failed_log_has_correct_path(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "secret")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    ev = _events(caplog, "auth_failed")[0]
-    assert ev["path"] == "/v1/completions"
-
-
-def test_auth_failed_log_has_client_ip_field(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "secret")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    ev = _events(caplog, "auth_failed")[0]
-    assert "client_ip" in ev
-
-
-def test_auth_failed_log_request_id_field_present(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "secret")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    ev = _events(caplog, "auth_failed")[0]
-    assert "request_id" in ev
-
-
-def test_auth_failed_log_is_warning_level(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "secret")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.DEBUG, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    warning_records = [
-        r for r in caplog.records
-        if r.name.startswith("llm") and r.levelno == logging.WARNING
-    ]
-    events = [json.loads(r.getMessage()) for r in warning_records if _is_json(r.getMessage())]
-    auth_fails = [e for e in events if e.get("event") == "auth_failed"]
-    assert len(auth_fails) == 1
-
-
-def test_no_auth_failed_log_on_correct_key(monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEYS", "correct-key")
-    client = TestClient(create_app())
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", headers={"x-api-key": "correct-key"}, json={"prompt": "hello"})
-
-    assert len(_events(caplog, "auth_failed")) == 0
-
-
-def test_no_auth_failed_log_when_endpoint_is_open(caplog):
-    client = TestClient(create_app())  # no LLM_API_KEYS set
-    with caplog.at_level(logging.WARNING, logger="llm"):
-        client.post("/v1/completions", json={"prompt": "hello"})
-
-    assert len(_events(caplog, "auth_failed")) == 0
-
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-def _is_json(s: str) -> bool:
-    try:
-        json.loads(s)
-        return True
-    except json.JSONDecodeError:
-        return False
