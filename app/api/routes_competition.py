@@ -30,4 +30,4 @@ async def agent_thaillm(
     )
     answer, tokens, trace = await _run_agent(req.question, config)
     write_audit_trail(id_, trace, settings.audit_trail_dir)
-    return AgentResponse(id=id_, answer=answer, total_output_token=tokens)
+    return AgentResponse(id=id_, answer=answer, total_output_token_count=tokens)

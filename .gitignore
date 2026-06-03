@@ -29,3 +29,12 @@ CLAUDE.md
 *.pem
 *.key
 *.p12
+# bundled competition agent code (build-time only; not generic)
+agent_src/
+
+# never commit the database (mounted read-only at runtime) or audit output
+*.duckdb
+*.db
+*.sqlite
+*.sqlite3
+audit_trails/

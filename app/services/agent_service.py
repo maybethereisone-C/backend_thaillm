@@ -12,12 +12,15 @@ module-level name that cannot be safely overwritten by concurrent callers.
 import asyncio
 import json
 import threading
+import time
 import types
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 _DEFAULT_TEMPERATURE = 0.0
-_DEFAULT_MAX_TOKENS = 1500
+_DEFAULT_MAX_TOKENS = 2500
 _DEFAULT_NUM_CTX = 8192
+_RETRY_STATUS = {502, 503, 504}
+_MAX_RETRIES = 3
 
 _IMPORT_LOCK = threading.Lock()
 _RUN_LOCK = threading.Lock()
@@ -34,6 +37,7 @@ class AgentConfig:
     agent_db_path: str = ""
     agent_src_path: str = ""
     timeout: float = 300.0
+    max_steps: int = 8
 
 
 def _load_agent_modules(agent_src_path: str) -> tuple[types.ModuleType, types.ModuleType]:
@@ -84,16 +88,29 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
             "temperature": temperature,
             "max_tokens": _DEFAULT_MAX_TOKENS,
         }
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; llm-gateway/1.0)",
+        }
         if config.api_key:
             headers["Authorization"] = f"Bearer {config.api_key}"
-        req = _req.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=headers,
-        )
-        with _req.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-            data = json.loads(resp.read().decode("utf-8"))
+        import urllib.error as _err
+        data = None
+        for _attempt in range(_MAX_RETRIES + 1):
+            req = _req.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+            )
+            try:
+                with _req.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+                    data = json.loads(resp.read().decode("utf-8"))
+                break
+            except _err.HTTPError as exc:
+                if exc.code in _RETRY_STATUS and _attempt < _MAX_RETRIES:
+                    time.sleep(2 ** _attempt)
+                    continue
+                raise
         usage = data.get("usage") or {}
         token_counter[0] += int(usage.get("completion_tokens", 0) or 0)
         choices = data.get("choices") or [{}]
@@ -104,7 +121,7 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
 
 
 async def run_agent(question: str, config: AgentConfig) -> tuple[str, int, str]:
-    """Run the ReAct agent and return (answer, total_output_token, trace_json)."""
+    """Run the ReAct agent and return (answer, total_output_token_count, trace_json)."""
     if not config.agent_src_path:
         raise ValueError(
             "AgentConfig.agent_src_path is empty; "
@@ -130,6 +147,7 @@ async def run_agent(question: str, config: AgentConfig) -> tuple[str, int, str]:
                     sanitized,
                     config.agent_db_path,
                     model=config.model_id,
+                    max_steps=config.max_steps,
                 )
             finally:
                 agent_module.chat = orig_agent

@@ -26,9 +26,9 @@ def test_agent_thaillm_returns_competition_shape(client):
         r = client.post("/agent/thaillm", json={"question": "test question"})
     assert r.status_code == 200
     body = r.json()
-    assert set(body.keys()) == {"id", "answer", "total_output_token"}
+    assert set(body.keys()) == {"id", "answer", "total_output_token_count"}
     assert body["answer"] == "ตอบ 45900 บาท"
-    assert body["total_output_token"] == 128
+    assert body["total_output_token_count"] == 128
 
 
 def test_agent_thaillm_writes_audit_trail(client, tmp_path, monkeypatch):

@@ -2,6 +2,12 @@
 
 FastAPI inference gateway with OpenAI-compatible endpoints, prompt-injection guardrails, and API-key auth. Proxies requests to any OpenAI-compatible upstream, or runs a built-in fake backend for local development.
 
+## Requirements
+
+- Python 3.11 and [uv](https://docs.astral.sh/uv/)
+- Docker (for containerized deployment)
+- For the agent back-test endpoint: a DuckDB database file (mounted at runtime) and the bundled agent code in `agent_src/`
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -137,23 +143,46 @@ Interactive API docs are served at `/docs` (Swagger UI) and `/redoc`.
 
 **Response**
 ```json
-{"id": "550e8400-e29b-41d4-a716-446655440000", "answer": "45900", "total_output_token": 312}
+{"id": "550e8400-e29b-41d4-a716-446655440000", "answer": "45900", "total_output_token_count": 312}
 ```
 
 - `id` — UUID generated per request; used as the audit trail filename
 - `answer` — agent answer in Thai or English
-- `total_output_token` — output tokens consumed (used in cost scoring)
+- `total_output_token_count` — output tokens consumed (used in cost scoring)
 
 Each request writes `{id}.txt` (the agent reasoning trace) to `LLM_AUDIT_TRAIL_DIR`.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LLM_AUDIT_TRAIL_DIR` | `audit_trails` | Directory for `{id}.txt` audit files |
-| `LLM_AGENT_DB_PATH` | `""` | Path to `fahmai_rag.db` |
-| `LLM_AGENT_SRC_PATH` | `""` | Path to `fahmai_db_agent/src` containing `agent.py` |
+| `LLM_AUDIT_TRAIL_DIR` | `audit_trails` | Directory for `{id}.txt` audit files (set to a writable path, e.g. `/data/audit_trails`) |
+| `LLM_AGENT_DB_PATH` | `""` | Path to the DuckDB database file the agent queries |
+| `LLM_AGENT_SRC_PATH` | `""` | Path to the directory containing the agent modules (`agent.py`, `tools.py`, …) |
 | `LLM_THAILLM_BASE_URL` | — | ThaiLLM upstream base URL (OpenAI-compatible) |
 | `LLM_THAILLM_MODEL_ID` | `""` | ThaiLLM model name |
 | `LLM_THAILLM_API_KEY` | — | ThaiLLM API key |
+| `PORT` | `8000` | Container listen port; the deploy platform maps host:`YOUR_PORT` → this port |
+
+### Running the agent back-test
+
+The `/agent/thaillm` endpoint runs a ReAct SQL agent (bundled in `agent_src/`, copied into the image at `/agent/src`) against a DuckDB database. The database is **not** part of the image — mount it read-only at runtime:
+
+```bash
+make docker-build
+docker run -d --name llm-gateway -p 8000:8000 \
+  -e LLM_BACKEND=openai_compatible \
+  -e LLM_UPSTREAM_BASE_URL=https://your-thaillm-host/v1 \
+  -e LLM_UPSTREAM_API_KEY=YOUR_KEY \
+  -e LLM_MODEL_ID=your-model-id \
+  -e LLM_THAILLM_BASE_URL=https://your-thaillm-host/v1 \
+  -e LLM_THAILLM_MODEL_ID=your-model-id \
+  -e LLM_THAILLM_API_KEY=YOUR_KEY \
+  -v /path/to/your.duckdb:/data/agent.duckdb:ro \
+  llm-gateway
+```
+
+`LLM_AGENT_SRC_PATH` (`/agent/src`), `LLM_AGENT_DB_PATH` (`/data/agent.duckdb`), and `LLM_AUDIT_TRAIL_DIR` (`/data/audit_trails`) already default to in-image paths via the Dockerfile, so only the upstream/model/key env and the database mount are required.
+
+**Evaluator connectivity:** the scoring server POSTs to `http(s)://<host>:<port>/agent/thaillm`. Host and port are assigned by the deployment platform's port mapping — set `PORT` (or keep the default `8000`) to match the in-container port the platform maps, and expose `/agent/thaillm`. No external URL is hardcoded in the code.
 
 ## Make Targets
 
@@ -187,6 +216,23 @@ All settings use the `LLM_` prefix. Set them via `.env` or environment variables
 | `LLM_PROMPT_GUARD_ENABLED` | `true` | Prompt-injection detection |
 
 `LLM_API_KEYS`, `LLM_ALLOWED_ORIGINS`, and `LLM_TRUSTED_HOSTS` accept either CSV (`a,b`) or a JSON list (`["a","b"]`).
+
+## Project Layout
+
+```
+app/
+  main.py            create_app(); ASGI object `app`
+  core/settings.py   all settings (LLM_ prefix)
+  api/               routers: /v1 inference + /agent/thaillm
+  services/          inference, agent bridge, audit trail
+  backends/          fake + openai_compatible (factory-selected)
+  schemas/           request/response models
+  middleware.py      request-id, logging, guards
+agent_src/           bundled ReAct agent (agent.py, tools.py, ...); DuckDB, copied to /agent/src in the image
+scripts/             benchmark_thaillm.py (evaluation harness)
+tests/               unit + integration (112 tests)
+Dockerfile           multi-worker image; bundles agent_src, creates writable /data
+```
 
 ## Security Checklist
 

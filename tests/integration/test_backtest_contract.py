@@ -8,7 +8,7 @@ the full response contract including the audit trail anti-cheat requirement.
 Slide 20 spec
 ─────────────
   POST /agent/thaillm  input: {"question": "..."}
-  output: {"id": "...", "answer": "...", "total_output_token": N}
+  output: {"id": "...", "answer": "...", "total_output_token_count": N}
   Audit trail per request → {id}.txt
 """
 import json
@@ -28,8 +28,8 @@ def audit_dir(tmp_path):
 @pytest.fixture
 def client(audit_dir, monkeypatch):
     monkeypatch.setenv("LLM_AUDIT_TRAIL_DIR", str(audit_dir))
-    monkeypatch.setenv("LLM_AGENT_DB_PATH", "/data/fahmai_rag.db")
-    monkeypatch.setenv("LLM_AGENT_SRC_PATH", "/data/fahmai_db_agent/src")
+    monkeypatch.setenv("LLM_AGENT_DB_PATH", "/data/agent.duckdb")
+    monkeypatch.setenv("LLM_AGENT_SRC_PATH", "/agent/src")
     monkeypatch.setenv("LLM_THAILLM_BASE_URL", "http://thaillm.nti.internal/v1")
     monkeypatch.setenv("LLM_THAILLM_MODEL_ID", "openthaigpt")
     return TestClient(create_app())
@@ -49,7 +49,7 @@ def test_response_exact_keys(client):
     with patch("app.api.routes_competition._run_agent", _agent_mock()):
         r = client.post("/agent/thaillm", json={"question": "ราคา MSRP ของ NT-LT-001"})
     assert r.status_code == 200
-    assert set(r.json().keys()) == {"id", "answer", "total_output_token"}
+    assert set(r.json().keys()) == {"id", "answer", "total_output_token_count"}
 
 
 def test_response_field_types(client):
@@ -58,8 +58,8 @@ def test_response_field_types(client):
     body = r.json()
     assert isinstance(body["id"], str)
     assert isinstance(body["answer"], str)
-    assert isinstance(body["total_output_token"], int)
-    assert body["total_output_token"] == 312
+    assert isinstance(body["total_output_token_count"], int)
+    assert body["total_output_token_count"] == 312
 
 
 def test_response_content_type_is_json(client):
@@ -164,9 +164,9 @@ def test_handles_real_competition_questions(client, qid, question):
         r = client.post("/agent/thaillm", json={"question": question})
     assert r.status_code == 200
     body = r.json()
-    assert set(body.keys()) == {"id", "answer", "total_output_token"}
+    assert set(body.keys()) == {"id", "answer", "total_output_token_count"}
     uuid.UUID(body["id"])
-    assert isinstance(body["total_output_token"], int)
+    assert isinstance(body["total_output_token_count"], int)
 
 
 # ── Input validation ──────────────────────────────────────────────────────────

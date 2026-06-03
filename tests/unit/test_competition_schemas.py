@@ -25,5 +25,5 @@ def test_agent_request_accepts_max_length_question():
 
 
 def test_agent_response_shape():
-    resp = AgentResponse(id="uuid-1", answer="45900", total_output_token=42)
-    assert resp.total_output_token == 42
+    resp = AgentResponse(id="uuid-1", answer="45900", total_output_token_count=42)
+    assert resp.total_output_token_count == 42

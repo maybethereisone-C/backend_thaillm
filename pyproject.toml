@@ -5,6 +5,7 @@ description = "FastAPI inference gateway with API-key auth and prompt guardrails
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "duckdb>=1.1.0",
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
     "pydantic>=2.13.4",

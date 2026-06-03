@@ -10,4 +10,4 @@ class AgentRequest(BaseModel):
 class AgentResponse(BaseModel):
     id: str
     answer: str
-    total_output_token: int
+    total_output_token_count: int
