@@ -14,7 +14,7 @@ import json
 import threading
 import time
 import types
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 _DEFAULT_TEMPERATURE = 0.0
 _DEFAULT_MAX_TOKENS = 2500
