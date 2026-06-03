@@ -91,6 +91,9 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
             "messages": messages,
             "temperature": temperature,
             "max_tokens": _DEFAULT_MAX_TOKENS,
+            # The upstream is a reasoning model; disable the think phase so the
+            # answer lands in message.content instead of a reasoning field.
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         headers = {
             "Content-Type": "application/json",
@@ -148,7 +151,14 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
         token_counter[0] += int(usage.get("completion_tokens", 0) or 0)
         choices = data.get("choices") or [{}]
         message = (choices[0] if isinstance(choices[0], dict) else {}).get("message") or {}
-        return (message.get("content") or "").strip()
+        # Fall back to reasoning fields if a reasoning model leaves content empty.
+        text = (
+            message.get("content")
+            or message.get("reasoning_content")
+            or message.get("reasoning")
+            or ""
+        )
+        return text.strip()
 
     return chat
 
