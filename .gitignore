@@ -22,15 +22,13 @@ build/
 *.egg-info/
 logs/
 *.log
-docs/*
-!docs/pipeline.html
+docs/
 .claude/
 CLAUDE.md
 *.pem
 *.key
 *.p12
-# bundled competition agent code (build-time only; not generic)
-agent_src/
+# agent_src/ is tracked — Dockerfile COPYs it; required for git-based builds
 
 # never commit the database (mounted read-only at runtime) or audit output
 *.duckdb
@@ -41,4 +39,3 @@ audit_trails/
 
 # local eval harness — keep out of the public repo
 scripts/
-docs/RUN_ON_B200.md
