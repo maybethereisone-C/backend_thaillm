@@ -1,6 +1,7 @@
+import asyncio
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.settings import Settings, get_settings
 from app.schemas.competition import AgentRequest, AgentResponse
@@ -16,6 +17,8 @@ async def agent_thaillm(
     req: AgentRequest,
     settings: Settings = Depends(get_settings),
 ) -> AgentResponse:
+    if not settings.thaillm_base_url:
+        raise HTTPException(status_code=503, detail="ThaiLLM endpoint not configured")
     id_ = str(uuid.uuid4())
     config = AgentConfig(
         model_id=settings.thaillm_model_id,
@@ -29,5 +32,5 @@ async def agent_thaillm(
         agent_src_path=settings.agent_src_path,
     )
     answer, tokens, trace = await _run_agent(req.question, config)
-    write_audit_trail(id_, trace, settings.audit_trail_dir)
+    await asyncio.to_thread(write_audit_trail, id_, trace, settings.audit_trail_dir)
     return AgentResponse(id=id_, answer=answer, total_output_token_count=tokens)

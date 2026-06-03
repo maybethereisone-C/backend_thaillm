@@ -182,6 +182,8 @@ docker run -d --name llm-gateway -p 8000:8000 \
 
 `LLM_AGENT_SRC_PATH` (`/agent/src`), `LLM_AGENT_DB_PATH` (`/data/agent.duckdb`), and `LLM_AUDIT_TRAIL_DIR` (`/data/audit_trails`) already default to in-image paths via the Dockerfile, so only the upstream/model/key env and the database mount are required.
 
+> **Build prerequisite:** `agent_src/` is intentionally excluded from version control (competition code), so a fresh clone has no agent modules. Place `agent.py`, `tools.py`, `ollama_client.py`, and `refusal.py` into `agent_src/` before `make docker-build`, or the `COPY agent_src/` step will fail.
+
 **Evaluator connectivity:** the scoring server POSTs to `http(s)://<host>:<port>/agent/thaillm`. Host and port are assigned by the deployment platform's port mapping — set `PORT` (or keep the default `8000`) to match the in-container port the platform maps, and expose `/agent/thaillm`. No external URL is hardcoded in the code.
 
 ## Make Targets

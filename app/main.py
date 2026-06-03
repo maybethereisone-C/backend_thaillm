@@ -23,14 +23,17 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(title="LLM Inference Gateway", version=settings.api_version)
-    app.add_middleware(RequestIdMiddleware)
-    app.add_middleware(AuditLogMiddleware)
-    app.add_middleware(SecurityHeadersMiddleware)
+    # add_middleware prepends, so the last added runs outermost (first inbound).
+    # Order: RequestId (outermost) -> AuditLog -> SecurityHeaders -> ApiKeyAuth (innermost),
+    # so a 401 still carries a request id and is audited.
     app.add_middleware(
         ApiKeyAuthMiddleware,
         api_keys=settings.api_keys,
         protected_prefixes=("/v1",),
     )
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(AuditLogMiddleware)
+    app.add_middleware(RequestIdMiddleware)
     if settings.allowed_origins:
         app.add_middleware(
             CORSMiddleware,

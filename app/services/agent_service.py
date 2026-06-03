@@ -111,6 +111,13 @@ def _make_chat(config: AgentConfig, token_counter: list[int]):
                     time.sleep(2 ** _attempt)
                     continue
                 raise
+            except (_err.URLError, OSError) as exc:
+                if _attempt < _MAX_RETRIES:
+                    time.sleep(2 ** _attempt)
+                    continue
+                raise RuntimeError(f"ThaiLLM upstream unreachable: {exc}") from exc
+        if data is None:
+            raise RuntimeError("ThaiLLM upstream returned no data")
         usage = data.get("usage") or {}
         token_counter[0] += int(usage.get("completion_tokens", 0) or 0)
         choices = data.get("choices") or [{}]

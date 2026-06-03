@@ -86,12 +86,13 @@ class OpenAICompatibleBackend(InferenceBackend):
             async with self._client_factory(timeout=self._settings.request_timeout_seconds) as client:
                 response = await client.get(f"{self._base_url}/models", headers=self._headers())
                 response.raise_for_status()
-        except httpx.HTTPError as exc:
+        except httpx.HTTPError:
+            # Do not surface str(exc); it contains the upstream URL on the public /health.
             return BackendHealth(
                 backend="openai_compatible",
                 model=self._settings.model_id,
                 ready=False,
-                detail=str(exc),
+                detail="upstream unreachable",
             )
 
         return BackendHealth(backend="openai_compatible", model=self._settings.model_id, ready=True)

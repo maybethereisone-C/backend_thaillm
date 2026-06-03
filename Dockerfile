@@ -29,6 +29,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ.get('PORT', '8000'))"
 
-# Shell form so ${PORT} is honored at runtime; defaults to 8000. The deploy platform
-# maps an external host port to this in-container port.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4 --loop uvloop --http httptools
+# exec form via sh -c so ${PORT} is honored AND exec replaces the shell, making
+# uvicorn PID 1 so SIGTERM (docker stop) reaches it for graceful shutdown.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4 --loop uvloop --http httptools"]

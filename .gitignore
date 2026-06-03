@@ -38,3 +38,6 @@ agent_src/
 *.sqlite
 *.sqlite3
 audit_trails/
+
+# local eval harness — keep out of the public repo
+scripts/
