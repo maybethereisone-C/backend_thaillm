@@ -37,19 +37,23 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class AuditLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         started = perf_counter()
-        response = await call_next(request)
-        duration_ms = round((perf_counter() - started) * 1000, 2)
-        audit_logger.info(json.dumps({
-            "event": "request",
-            "method": request.method,
-            "path": request.url.path,
-            "status": response.status_code,
-            "duration_ms": duration_ms,
-            "request_id": getattr(request.state, "request_id", None),
-            "client_ip": request.client.host if request.client else None,
-            "key_prefix": _key_prefix(request),
-        }))
-        return response
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            duration_ms = round((perf_counter() - started) * 1000, 2)
+            audit_logger.info(json.dumps({
+                "event": "request",
+                "method": request.method,
+                "path": request.url.path,
+                "status": status_code,
+                "duration_ms": duration_ms,
+                "request_id": getattr(request.state, "request_id", None),
+                "client_ip": request.client.host if request.client else None,
+                "key_prefix": _key_prefix(request),
+            }))
 
 
 def _key_prefix(request: Request) -> str | None:

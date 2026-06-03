@@ -6,8 +6,9 @@ imported once and cached. Per call, ``agent.chat`` is replaced with a
 closure that calls the configured ThaiLLM endpoint and accumulates output
 tokens. The original binding is restored in a finally block.
 
-Runs are serialized by a lock because ``agent.chat`` is a single shared
-module-level name that cannot be safely overwritten by concurrent callers.
+Runs are serialized by an asyncio lock so that timeouts (asyncio.wait_for
+cancellation) release the lock immediately, unblocking queued requests.
+_IMPORT_LOCK uses threading.Lock because module import runs in a thread.
 """
 import asyncio
 import json
@@ -23,7 +24,7 @@ _RETRY_STATUS = {502, 503, 504}
 _MAX_RETRIES = 3
 
 _IMPORT_LOCK = threading.Lock()
-_RUN_LOCK = threading.Lock()
+_RUN_LOCK = asyncio.Lock()
 
 _AGENT_MODULE: types.ModuleType | None = None
 _OLLAMA_MODULE: types.ModuleType | None = None
@@ -144,26 +145,26 @@ async def run_agent(question: str, config: AgentConfig) -> tuple[str, int, str]:
     patched = _make_chat(config, token_counter)
 
     def _invoke() -> dict:
-        with _RUN_LOCK:
-            orig_agent = agent_module.chat
-            orig_client = ollama_module.chat
-            agent_module.chat = patched
-            ollama_module.chat = patched
-            try:
-                return agent_module.run_agent(
-                    sanitized,
-                    config.agent_db_path,
-                    model=config.model_id,
-                    max_steps=config.max_steps,
-                )
-            finally:
-                agent_module.chat = orig_agent
-                ollama_module.chat = orig_client
+        orig_agent = agent_module.chat
+        orig_client = ollama_module.chat
+        agent_module.chat = patched
+        ollama_module.chat = patched
+        try:
+            return agent_module.run_agent(
+                sanitized,
+                config.agent_db_path,
+                model=config.model_id,
+                max_steps=config.max_steps,
+            )
+        finally:
+            agent_module.chat = orig_agent
+            ollama_module.chat = orig_client
 
-    result = await asyncio.wait_for(
-        asyncio.to_thread(_invoke),
-        timeout=config.timeout * (_MAX_RETRIES + 1) + 10,
-    )
+    async with _RUN_LOCK:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(_invoke),
+            timeout=config.timeout * (_MAX_RETRIES + 1) + 10,
+        )
     answer = str(result.get("answer", ""))
     trace_text = json.dumps(result.get("trace", []), ensure_ascii=False)
     return answer, token_counter[0], trace_text

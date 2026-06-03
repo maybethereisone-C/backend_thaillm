@@ -141,3 +141,20 @@ def test_one_request_event_per_http_call(caplog):
 
     events = _events(caplog, "request")
     assert len(events) == 2
+
+
+def test_request_event_emitted_on_500_response(tmp_path, monkeypatch, caplog):
+    """Audit log must fire even when the route returns a 500 error."""
+    monkeypatch.setenv("LLM_AGENT_SRC_PATH", "")
+    monkeypatch.setenv("LLM_AGENT_DB_PATH", "")
+    monkeypatch.setenv("LLM_AUDIT_TRAIL_DIR", str(tmp_path))
+    monkeypatch.setenv("LLM_THAILLM_BASE_URL", "http://fake.internal/v1")
+    monkeypatch.setenv("LLM_THAILLM_MODEL_ID", "model")
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    with caplog.at_level(logging.INFO, logger="llm"):
+        r = client.post("/agent/thaillm", json={"question": "test"})
+
+    assert r.status_code == 500
+    events = _events(caplog, "request")
+    assert len(events) == 1
+    assert events[0]["status"] == 500
