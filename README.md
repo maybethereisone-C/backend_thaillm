@@ -22,7 +22,7 @@ FastAPI service exposing a ReAct agent endpoint for the ThaiLLM competition. Wra
 ```bash
 uv sync
 cp .env.example .env
-# edit .env: set LLM_THAILLM_BASE_URL, LLM_THAILLM_MODEL_ID, LLM_THAILLM_API_KEY
+# edit .env: set LLM_THAILLM_BASE_URL to the local model server, LLM_THAILLM_MODEL_ID
 # set LLM_AGENT_SRC_PATH and LLM_AGENT_DB_PATH to local paths
 ```
 
@@ -38,12 +38,22 @@ make run    # production-settings server
 ```bash
 make docker-build
 docker run -d --name llm-gateway -p 8000:8000 \
-  -e LLM_THAILLM_BASE_URL=https://your-thaillm-host/v1 \
-  -e LLM_THAILLM_MODEL_ID=your-model-id \
-  -e LLM_THAILLM_API_KEY=YOUR_KEY \
+  -e LLM_THAILLM_BASE_URL=http://host.docker.internal:8080/v1 \
+  -e LLM_THAILLM_MODEL_ID=typhoon-s-thaillm-8b-instruct \
   -v /path/to/your.duckdb:/data/agent.duckdb:ro \
   llm-gateway
 ```
+
+The gateway calls a local OpenAI-compatible model server (e.g. `llama-server`
+serving the gguf) — no API key. Run the model server separately, for example:
+
+```bash
+llama-server -m /data/model/typhoon-s-thaillm-8b-instruct-research-preview.f16.gguf \
+  --host 0.0.0.0 --port 8080 --ctx-size 8192
+```
+
+Point `LLM_THAILLM_BASE_URL` at that server's address as reachable from the
+gateway container.
 
 `LLM_AGENT_SRC_PATH` (`/agent/src`), `LLM_AGENT_DB_PATH` (`/data/agent.duckdb`), and `LLM_AUDIT_TRAIL_DIR` (`/data/audit_trails`) default to in-image paths via the Dockerfile.
 
@@ -73,9 +83,8 @@ All settings use the `LLM_` prefix. Set via `.env` or environment variables.
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `LLM_THAILLM_BASE_URL` | — | ThaiLLM upstream base URL (OpenAI-compatible) |
-| `LLM_THAILLM_MODEL_ID` | `""` | Model name |
-| `LLM_THAILLM_API_KEY` | — | Bearer token for the upstream |
+| `LLM_THAILLM_BASE_URL` | `http://127.0.0.1:8080/v1` | Local OpenAI-compatible model server (llama-server) |
+| `LLM_THAILLM_MODEL_ID` | `typhoon-s-thaillm-8b-instruct` | Model name sent in the request (cosmetic for llama-server) |
 | `LLM_AGENT_SRC_PATH` | `""` | Directory containing `agent.py`, `tools.py`, … |
 | `LLM_AGENT_DB_PATH` | `""` | Path to the DuckDB database file |
 | `LLM_AUDIT_TRAIL_DIR` | `audit_trails` | Directory for `{id}.txt` audit files |

@@ -18,7 +18,13 @@ COPY agent_src/ /agent/src/
 
 ENV LLM_AGENT_SRC_PATH=/agent/src \
     LLM_AGENT_DB_PATH=/data/agent.duckdb \
-    LLM_AUDIT_TRAIL_DIR=/data/audit_trails
+    LLM_AUDIT_TRAIL_DIR=/data/audit_trails \
+    LLM_THAILLM_MODEL_ID=typhoon-s-thaillm-8b-instruct
+
+# Set at deploy time to the local OpenAI-compatible model server (llama-server)
+# reachable from this container, e.g. http://host.docker.internal:8080/v1 or a
+# sidecar service URL. No API key — the model is served locally.
+#   ENV LLM_THAILLM_BASE_URL=http://host.docker.internal:8080/v1
 
 RUN mkdir -p /data/audit_trails && chown -R llm:llm /data
 

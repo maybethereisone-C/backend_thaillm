@@ -2,7 +2,7 @@ from functools import lru_cache
 import json
 from typing import Annotated
 
-from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
+from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -18,9 +18,10 @@ class Settings(BaseSettings):
     audit_trail_dir: str = "audit_trails"
     agent_db_path: str = ""
     agent_src_path: str = ""
-    thaillm_base_url: AnyHttpUrl | None = None
-    thaillm_model_id: str = ""
-    thaillm_api_key: SecretStr | None = None
+    # Local OpenAI-compatible model server (e.g. llama.cpp llama-server) that
+    # serves the same model as the upstream. No API key: the server is local.
+    thaillm_base_url: AnyHttpUrl | None = Field(default="http://127.0.0.1:8080/v1")
+    thaillm_model_id: str = "typhoon-s-thaillm-8b-instruct"
 
     @field_validator("allowed_origins", "trusted_hosts", mode="before")
     @classmethod
